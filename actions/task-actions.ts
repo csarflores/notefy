@@ -1,0 +1,252 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import connectDB from '@/lib/mongodb';
+import Task from '@/models/Task';
+import { CreateTaskInput, UpdateTaskInput, ApiResponse, ITask } from '@/types';
+import { isValidObjectId } from '@/lib/utils';
+
+// Obtener todas las tareas de un proyecto
+export async function getProjectTasks(projectId: string): Promise<ApiResponse<ITask[]>> {
+  try {
+    if (!isValidObjectId(projectId)) {
+      return { success: false, error: 'ID de proyecto inválido' };
+    }
+
+    await connectDB();
+
+    const tasks = await Task.find({ projectId })
+      .sort({ order: 1, createdAt: -1 })
+      .populate('assignedTo', 'name email image')
+      .lean();
+
+    return { success: true, data: JSON.parse(JSON.stringify(tasks)) };
+  } catch (error) {
+    console.error('Error al obtener tareas:', error);
+    return { success: false, error: 'Error al obtener las tareas' };
+  }
+}
+
+// Obtener tareas por estado
+export async function getTasksByStatus(
+  projectId: string,
+  status: 'todo' | 'in-progress' | 'done'
+): Promise<ApiResponse<ITask[]>> {
+  try {
+    if (!isValidObjectId(projectId)) {
+      return { success: false, error: 'ID de proyecto inválido' };
+    }
+
+    await connectDB();
+
+    const tasks = await Task.find({ projectId, status })
+      .sort({ order: 1, createdAt: -1 })
+      .populate('assignedTo', 'name email image')
+      .lean();
+
+    return { success: true, data: JSON.parse(JSON.stringify(tasks)) };
+  } catch (error) {
+    console.error('Error al obtener tareas:', error);
+    return { success: false, error: 'Error al obtener las tareas' };
+  }
+}
+
+// Crear una nueva tarea
+export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITask>> {
+  try {
+    if (!data.title || data.title.trim().length === 0) {
+      return { success: false, error: 'El título es requerido' };
+    }
+
+    if (!isValidObjectId(data.projectId)) {
+      return { success: false, error: 'ID de proyecto inválido' };
+    }
+
+    await connectDB();
+
+    // Obtener el orden más alto en la columna
+    const lastTask = await Task.findOne({
+      projectId: data.projectId,
+      status: data.status || 'todo',
+    })
+      .sort({ order: -1 })
+      .select('order');
+
+    const newOrder = lastTask ? lastTask.order + 1 : 0;
+
+    const newTask = await Task.create({
+      title: data.title.trim(),
+      description: data.description?.trim() || '',
+      projectId: data.projectId,
+      status: data.status || 'todo',
+      assignedTo: data.assignedTo || [],
+      tags: data.tags || [],
+      order: newOrder,
+    });
+
+    const populatedTask = await Task.findById(newTask._id)
+      .populate('assignedTo', 'name email image')
+      .lean();
+
+    revalidatePath(`/project/${data.projectId}`);
+
+    return { success: true, data: JSON.parse(JSON.stringify(populatedTask)) };
+  } catch (error) {
+    console.error('Error al crear tarea:', error);
+    return { success: false, error: 'Error al crear la tarea' };
+  }
+}
+
+// Actualizar una tarea
+export async function updateTask(
+  taskId: string,
+  data: UpdateTaskInput
+): Promise<ApiResponse<ITask>> {
+  try {
+    if (!isValidObjectId(taskId)) {
+      return { success: false, error: 'ID de tarea inválido' };
+    }
+
+    await connectDB();
+
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+      return { success: false, error: 'Tarea no encontrada' };
+    }
+
+    // Actualizar campos
+    if (data.title !== undefined) task.title = data.title.trim();
+    if (data.description !== undefined) task.description = data.description.trim();
+    if (data.status !== undefined) task.status = data.status;
+    if (data.assignedTo !== undefined) task.assignedTo = data.assignedTo as any;
+    if (data.tags !== undefined) task.tags = data.tags;
+    if (data.order !== undefined) task.order = data.order;
+    if (data.imageUrl !== undefined) task.imageUrl = data.imageUrl;
+
+    await task.save();
+
+    const updatedTask = await Task.findById(taskId)
+      .populate('assignedTo', 'name email image')
+      .lean();
+
+    revalidatePath(`/project/${task.projectId}`);
+
+    return { success: true, data: JSON.parse(JSON.stringify(updatedTask)) };
+  } catch (error) {
+    console.error('Error al actualizar tarea:', error);
+    return { success: false, error: 'Error al actualizar la tarea' };
+  }
+}
+
+// Mover tarea a otra columna (cambiar estado)
+export async function moveTask(
+  taskId: string,
+  newStatus: 'todo' | 'in-progress' | 'done',
+  newOrder: number
+): Promise<ApiResponse<ITask>> {
+  try {
+    if (!isValidObjectId(taskId)) {
+      return { success: false, error: 'ID de tarea inválido' };
+    }
+
+    await connectDB();
+
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+      return { success: false, error: 'Tarea no encontrada' };
+    }
+
+    const oldStatus = task.status;
+
+    // Si cambió de columna, reordenar las tareas
+    if (oldStatus !== newStatus) {
+      // Actualizar orden de tareas en la columna antigua
+      await Task.updateMany(
+        { projectId: task.projectId, status: oldStatus, order: { $gt: task.order } },
+        { $inc: { order: -1 } }
+      );
+
+      // Actualizar orden de tareas en la nueva columna
+      await Task.updateMany(
+        { projectId: task.projectId, status: newStatus, order: { $gte: newOrder } },
+        { $inc: { order: 1 } }
+      );
+    } else {
+      // Mismo estado, solo reordenar
+      if (newOrder > task.order) {
+        await Task.updateMany(
+          {
+            projectId: task.projectId,
+            status: newStatus,
+            order: { $gt: task.order, $lte: newOrder },
+          },
+          { $inc: { order: -1 } }
+        );
+      } else if (newOrder < task.order) {
+        await Task.updateMany(
+          {
+            projectId: task.projectId,
+            status: newStatus,
+            order: { $gte: newOrder, $lt: task.order },
+          },
+          { $inc: { order: 1 } }
+        );
+      }
+    }
+
+    // Actualizar la tarea movida
+    task.status = newStatus;
+    task.order = newOrder;
+    await task.save();
+
+    const updatedTask = await Task.findById(taskId)
+      .populate('assignedTo', 'name email image')
+      .lean();
+
+    revalidatePath(`/project/${task.projectId}`);
+
+    return { success: true, data: JSON.parse(JSON.stringify(updatedTask)) };
+  } catch (error) {
+    console.error('Error al mover tarea:', error);
+    return { success: false, error: 'Error al mover la tarea' };
+  }
+}
+
+// Eliminar una tarea
+export async function deleteTask(taskId: string): Promise<ApiResponse<null>> {
+  try {
+    if (!isValidObjectId(taskId)) {
+      return { success: false, error: 'ID de tarea inválido' };
+    }
+
+    await connectDB();
+
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+      return { success: false, error: 'Tarea no encontrada' };
+    }
+
+    const projectId = task.projectId;
+    const status = task.status;
+    const order = task.order;
+
+    // Eliminar la tarea
+    await Task.findByIdAndDelete(taskId);
+
+    // Reordenar las tareas restantes
+    await Task.updateMany(
+      { projectId, status, order: { $gt: order } },
+      { $inc: { order: -1 } }
+    );
+
+    revalidatePath(`/project/${projectId}`);
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al eliminar tarea:', error);
+    return { success: false, error: 'Error al eliminar la tarea' };
+  }
+}
