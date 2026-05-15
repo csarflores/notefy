@@ -71,7 +71,7 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`bg-gradient-to-br from-[#0066cc] to-[#0052a3] rounded-xl p-4 sm:p-5 shadow-md hover:shadow-lg transition-all duration-200 relative group ${
+      className={`bg-linear-to-br from-[#0066cc] to-[#0052a3] rounded-xl p-4 sm:p-5 shadow-md hover:shadow-lg transition-all duration-200 relative group ${
         isOver ? 'ring-4 ring-white ring-opacity-50 scale-105' : ''
       }`}
     >

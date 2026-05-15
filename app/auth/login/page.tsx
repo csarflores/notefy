@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
+import { Logo } from '@/components/ui/Logotipo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,9 +45,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-[#1d1d1f] mb-2">🍎 Notefy</h1>
-          <p className="text-[#7a7a7a]">Gestiona tus proyectos con estilo</p>
+        <div className="text-center mb-10">
+          <div className="flex justify-center mb-4">
+            <Logo size="large" linkTo="/" />
+          </div>
+          <p className="text-[#7a7a7a] text-sm">Gestiona tus proyectos con estilo</p>
         </div>
 
         {/* Card de login */}

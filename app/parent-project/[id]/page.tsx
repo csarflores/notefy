@@ -2,10 +2,10 @@ import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { redirect, notFound } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
-import { getProjectById } from '@/actions/project-actions';
+import { getProjectById, getProjectUsers } from '@/actions/project-actions';
 import { getProjectBoards } from '@/actions/board-actions';
 import BoardCard from '@/components/dashboard/BoardCard';
-import { ArrowLeft, FolderOpen, Plus } from 'lucide-react';
+import { ArrowLeft, FolderOpen, Plus, Users } from 'lucide-react';
 import Link from 'next/link';
 import ParentProjectClient from './ParentProjectClient';
 
@@ -91,6 +91,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   const project = projectResult.data;
 
+  const usersResult = await getProjectUsers(id);
+  const users = usersResult.success && usersResult.data ? usersResult.data : [];
+
+  const isOwner = project.owner.toString() === session.user.id;
+
   return (
     <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
@@ -119,6 +124,30 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <p className="text-[12px] sm:text-[13px] text-[#7a7a7a] tracking-[-0.12px]">
             Tableros de este proyecto
           </p>
+        </div>
+
+        {/* Miembros del proyecto */}
+        <div className="mb-3 flex justify-end items-center gap-2 text-sm bg-gray-50 p-2 rounded-lg">
+          <Users size={16} className="text-[#7a7a7a]" />
+          <span className="text-[#7a7a7a]">
+            {users.map((user, index) => (
+              <span key={user._id.toString()}>
+                {user.name}
+                {user._id.toString() === project.owner.toString() && (
+                  <span className="text-[#7a7a7a] ml-1">(owner)</span>
+                )}
+                {index < users.length - 1 && <span className="mx-1">·</span>}
+              </span>
+            ))}
+          </span>
+          {isOwner && (
+            <ParentProjectClient 
+              userId={session.user.id} 
+              parentId={id} 
+              project={project}
+              mode="share"
+            />
+          )}
         </div>
 
         {/* Botón de crear tablero */}

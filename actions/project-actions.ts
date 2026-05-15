@@ -194,7 +194,15 @@ export async function addProjectMember(
     project.members.push(email);
     await project.save();
 
+    // También agregar el miembro a todos los tableros del proyecto
+    const Board = (await import('@/models/Board')).default;
+    await Board.updateMany(
+      { projectId: projectId },
+      { $addToSet: { members: email } }
+    );
+
     revalidatePath(`/project/${projectId}`);
+    revalidatePath(`/parent-project/${projectId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(project)) };
   } catch (error) {
@@ -224,7 +232,15 @@ export async function removeProjectMember(
     project.members = project.members.filter((member) => member !== email);
     await project.save();
 
+    // También eliminar el miembro de todos los tableros del proyecto
+    const Board = (await import('@/models/Board')).default;
+    await Board.updateMany(
+      { projectId: projectId },
+      { $pull: { members: email } }
+    );
+
     revalidatePath(`/project/${projectId}`);
+    revalidatePath(`/parent-project/${projectId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(project)) };
   } catch (error) {

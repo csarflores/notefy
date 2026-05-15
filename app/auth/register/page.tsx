@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { registerUser } from '@/actions/auth-actions';
+import { Logo } from '@/components/ui/Logotipo';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -69,9 +70,11 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-[#1d1d1f] mb-2">🍎 Notefy</h1>
-          <p className="text-[#7a7a7a]">Crea tu cuenta y comienza a organizar</p>
+        <div className="text-center mb-10">
+          <div className="flex justify-center mb-4">
+            <Logo size="large" linkTo="/" />
+          </div>
+          <p className="text-[#7a7a7a] text-sm">Crea tu cuenta y comienza a organizar</p>
         </div>
 
         {/* Card de registro */}

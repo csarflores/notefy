@@ -157,11 +157,29 @@ export async function createBoard(
 
     await connectDB();
 
+    let projectMembers: string[] = [];
+
     if (data.projectId) {
       const Project = (await import('@/models/Project')).default;
       const project = await Project.findById(data.projectId);
       if (!project) {
         return { success: false, error: 'Proyecto no encontrado' };
+      }
+      // Heredar los miembros del proyecto (incluyendo el email del owner)
+      const User = (await import('@/models/User')).default;
+      const owner = await User.findById(project.owner).lean();
+      const ownerEmail = owner?.email;
+      const creator = await User.findById(userId).lean();
+      const creatorEmail = creator?.email;
+      
+      projectMembers = project.members || [];
+      // Asegurar que el email del owner esté en la lista
+      if (ownerEmail && !projectMembers.includes(ownerEmail)) {
+        projectMembers.push(ownerEmail);
+      }
+      // Asegurar que el email del creador esté en la lista
+      if (creatorEmail && !projectMembers.includes(creatorEmail)) {
+        projectMembers.push(creatorEmail);
       }
     }
 
@@ -169,7 +187,7 @@ export async function createBoard(
       name: data.name.trim(),
       description: data.description?.trim() || '',
       owner: userId,
-      members: [],
+      members: projectMembers,
       projectId: data.projectId || null,
     });
 

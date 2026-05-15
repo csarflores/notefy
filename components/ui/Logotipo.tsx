@@ -1,12 +1,26 @@
 // src/components/ui/Logo.tsx
 import React from 'react';
+import Link from 'next/link';
 
-export const Logo = ({ className = "h-8 w-8" }: { className?: string }) => {
-  return (
+export const Logo = ({ 
+  className = "h-10 w-10",
+  showText = true,
+  linkTo = "/",
+  size = "default"
+}: { 
+  className?: string;
+  showText?: boolean;
+  linkTo?: string;
+  size?: "default" | "large" | "small";
+}) => {
+  const textSize = size === "large" ? "text-3xl" : size === "small" ? "text-lg" : "text-2xl";
+  const iconSize = size === "large" ? "h-14 w-14" : size === "small" ? "h-7 w-7" : className;
+  
+  const logoContent = (
     <div className="flex items-center gap-3 select-none">
       {/* Isotipo Minimalista */}
       <svg 
-        className={className} 
+        className={iconSize} 
         viewBox="0 0 100 100" 
         fill="none" 
         xmlns="http://www.w3.org/2000/svg"
@@ -27,9 +41,17 @@ export const Logo = ({ className = "h-8 w-8" }: { className?: string }) => {
       </svg>
       
       {/* Logotipo / Texto */}
-      <span className="text-xl font-semibold tracking-tight text-[#1d1d1f]">
-        Notefy
-      </span>
+      {showText && (
+        <span className={`${textSize} font-bold tracking-tight text-[#1d1d1f]`}>
+          Notefy
+        </span>
+      )}
     </div>
   );
+
+  if (linkTo) {
+    return <Link href={linkTo}>{logoContent}</Link>;
+  }
+
+  return logoContent;
 };
