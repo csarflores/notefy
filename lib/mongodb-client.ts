@@ -1,11 +1,6 @@
 import { MongoClient } from 'mongodb';
 
 const uri = process.env.MONGODB_URI;
-
-if (!uri) {
-  throw new Error('Por favor define la variable MONGODB_URI en .env.local');
-}
-
 const options = {};
 
 let client: MongoClient;
@@ -15,15 +10,23 @@ declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-if (process.env.NODE_ENV === 'development') {
-  if (!global._mongoClientPromise) {
+// Solo crear la conexión si MONGODB_URI está definida
+if (uri) {
+  if (process.env.NODE_ENV === 'development') {
+    if (!global._mongoClientPromise) {
+      client = new MongoClient(uri, options);
+      global._mongoClientPromise = client.connect();
+    }
+    clientPromise = global._mongoClientPromise;
+  } else {
     client = new MongoClient(uri, options);
-    global._mongoClientPromise = client.connect();
+    clientPromise = client.connect();
   }
-  clientPromise = global._mongoClientPromise;
 } else {
-  client = new MongoClient(uri, options);
-  clientPromise = client.connect();
+  // Crear un promise que falla en runtime si se intenta usar sin MONGODB_URI
+  clientPromise = Promise.reject(
+    new Error('Por favor define la variable MONGODB_URI en .env.local')
+  );
 }
 
 export default clientPromise;
