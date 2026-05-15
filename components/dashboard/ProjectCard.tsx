@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, Calendar, MoreVertical, Edit2, Trash2 } from 'lucide-react';
-import Card from '@/components/ui/Card';
+import Link from 'next/link';
+import { Users, Calendar, MoreVertical, Edit2, Trash2, Lock } from 'lucide-react';
+import Avatar from '@/components/ui/Avatar';
 import EditProjectModal from './EditProjectModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { deleteProject } from '@/actions/project-actions';
@@ -40,74 +41,51 @@ export default function ProjectCard({ project }: ProjectCardProps) {
     }
   };
 
+  const handleEdit = () => {
+    setShowMenu(false);
+    setShowEditModal(true);
+  };
+
+  const members = project.members;
+
   return (
     <>
-      <Card hover onClick={handleClick} className="p-6 relative group">
-      <div className="space-y-4">
-        {/* Nombre del proyecto */}
-        <div>
-          <h3 className="text-xl font-semibold text-[#1d1d1f] mb-2 line-clamp-1">
+    <div className="bg-white rounded-lg p-3 sm:p-3.5 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-0.5 tracking-[-0.32px] truncate">
             {project.name}
           </h3>
           {project.description && (
-            <p className="text-sm text-[#7a7a7a] line-clamp-2">
+            <p className="text-[12px] text-[#7a7a7a] line-clamp-1 tracking-[-0.12px]">
               {project.description}
             </p>
           )}
         </div>
 
-        {/* Información adicional */}
-        <div className="flex items-center gap-4 text-sm text-[#7a7a7a]">
-          {/* Miembros */}
-          <div className="flex items-center gap-1.5">
-            <Users size={16} />
-            <span>
-              {project.members.length === 0
-                ? 'Solo tú'
-                : `${project.members.length + 1} miembro${project.members.length > 0 ? 's' : ''}`}
-            </span>
-          </div>
-
-          {/* Fecha de actualización */}
-          <div className="flex items-center gap-1.5">
-            <Calendar size={16} />
-            <span>{formatDate(project.updatedAt)}</span>
-          </div>
-        </div>
-
-        {/* Botón de opciones */}
-        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="relative shrink-0 ml-2">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMenu(!showMenu);
-            }}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-1 rounded-lg hover:bg-[#f5f5f7] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
           >
-            <MoreVertical size={16} className="text-[#7a7a7a]" />
+            <MoreVertical size={15} className="text-[#7a7a7a]" />
           </button>
 
-          {/* Menú desplegable */}
           {showMenu && (
             <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMenu(false);
-                  setShowEditModal(true);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-[#1d1d1f] hover:bg-gray-50 flex items-center gap-2"
+                onClick={handleEdit}
+                className="w-full px-3 py-2 text-left text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2 tracking-[-0.12px]"
               >
                 <Edit2 size={14} />
                 Editar
               </button>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setShowMenu(false);
                   setShowDeleteDialog(true);
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
+                className="w-full px-3 py-2 text-left text-[12px] text-red-500 hover:bg-red-50 flex items-center gap-2 tracking-[-0.12px]"
               >
                 <Trash2 size={14} />
                 Eliminar
@@ -116,7 +94,37 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           )}
         </div>
       </div>
-    </Card>
+
+      {/* Miembros */}
+      {members.length > 0 ? (
+        <div className="flex items-center gap-1 mb-2">
+          <Users size={12} className="text-[#7a7a7a]" />
+          <span className="text-[11px] text-[#7a7a7a] tracking-[-0.08px]">
+            {members.length} {members.length === 1 ? 'miembro' : 'miembros'}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1 mb-2">
+          <Lock size={12} className="text-[#7a7a7a]" />
+          <span className="text-[11px] text-[#7a7a7a] tracking-[-0.08px]">
+            Proyecto privado
+          </span>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-2 border-t border-[#e0e0e0]">
+        <span className="text-[10px] text-[#7a7a7a] tracking-[-0.08px]">
+          {formatDate(project.updatedAt)}
+        </span>
+        <Link
+          href={`/project/${project._id}`}
+          className="text-[12px] font-medium text-[#0066cc] hover:text-[#0071e3] transition-colors tracking-[-0.12px]"
+        >
+          Ver proyecto →
+        </Link>
+      </div>
+    </div>
 
     {/* Modal de edición */}
     <EditProjectModal

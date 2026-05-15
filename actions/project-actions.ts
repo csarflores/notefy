@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import connectDB from '@/lib/mongodb';
 import Project from '@/models/Project';
 import Task from '@/models/Task';
-import { CreateProjectInput, UpdateProjectInput, ApiResponse, IProject } from '@/types';
+import { CreateProjectInput, UpdateProjectInput, ApiResponse, IProject, ITag, IUser } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
 
 // Obtener todos los proyectos del usuario
@@ -50,13 +50,14 @@ export async function getProjectById(projectId: string): Promise<ApiResponse<IPr
 
     await connectDB();
 
-    const project = await Project.findById(projectId).lean();
+    const project = await Project.findById(projectId);
 
     if (!project) {
       return { success: false, error: 'Proyecto no encontrado' };
     }
 
-    return { success: true, data: JSON.parse(JSON.stringify(project)) };
+    const projectData = project.toObject();
+    return { success: true, data: JSON.parse(JSON.stringify(projectData)) };
   } catch (error) {
     console.error('Error al obtener proyecto:', error);
     return { success: false, error: 'Error al obtener el proyecto' };
@@ -225,5 +226,72 @@ export async function removeProjectMember(
   } catch (error) {
     console.error('Error al eliminar miembro:', error);
     return { success: false, error: 'Error al eliminar el miembro' };
+  }
+}
+
+// Agregar tag al proyecto
+export async function addProjectTag(
+  projectId: string,
+  tag: ITag
+): Promise<ApiResponse<IProject>> {
+  try {
+    if (!isValidObjectId(projectId)) {
+      return { success: false, error: 'ID de proyecto inválido' };
+    }
+
+    await connectDB();
+
+    const project = await Project.findById(projectId);
+
+    if (!project) {
+      return { success: false, error: 'Proyecto no encontrado' };
+    }
+
+    // Esta función ya no se usa - las etiquetas se obtienen de las tareas
+    return { success: false, error: 'Función deprecada - usar getProjectTags de tag-actions' };
+  } catch (error) {
+    console.error('Error al agregar tag:', error);
+    return { success: false, error: 'Error al agregar la etiqueta' };
+  }
+}
+
+// Obtener usuarios del proyecto (owner + members)
+export async function getProjectUsers(
+  projectId: string
+): Promise<ApiResponse<IUser[]>> {
+  try {
+    if (!isValidObjectId(projectId)) {
+      return { success: false, error: 'ID de proyecto inválido' };
+    }
+
+    await connectDB();
+
+    const project = await Project.findById(projectId).lean();
+
+    if (!project) {
+      return { success: false, error: 'Proyecto no encontrado' };
+    }
+
+    const User = (await import('@/models/User')).default;
+    
+    // Obtener owner
+    const owner = await User.findById(project.owner).select('_id name email image').lean();
+    
+    if (!owner) {
+      return { success: false, error: 'Propietario no encontrado' };
+    }
+
+    // Obtener members por email
+    const members = await User.find({
+      email: { $in: project.members }
+    }).select('_id name email image').lean();
+
+    // Combinar owner y members
+    const allUsers = [owner, ...members];
+
+    return { success: true, data: JSON.parse(JSON.stringify(allUsers)) };
+  } catch (error) {
+    console.error('Error al obtener usuarios del proyecto:', error);
+    return { success: false, error: 'Error al obtener los usuarios' };
   }
 }

@@ -22,15 +22,16 @@ async function ProjectsList({ userId }: { userId: string }) {
 
   if (projects.length === 0) {
     return (
-      <div className="text-center py-16">
-        <div className="max-w-md mx-auto">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#f5f5f7] flex items-center justify-center">
-            <Plus size={32} className="text-[#7a7a7a]" />
+      <div className="text-center py-12 sm:py-16">
+        <div className="max-w-md mx-auto px-4">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 rounded-full bg-[#f5f5f7] flex items-center justify-center">
+            <Plus size={24} className="sm:hidden text-[#7a7a7a]" />
+            <Plus size={32} className="hidden sm:block text-[#7a7a7a]" />
           </div>
-          <h3 className="text-xl font-semibold text-[#1d1d1f] mb-2">
+          <h3 className="text-[17px] sm:text-[21px] font-semibold text-[#1d1d1f] mb-2 tracking-[-0.374px]">
             No tienes proyectos aún
           </h3>
-          <p className="text-[#7a7a7a]">
+          <p className="text-[14px] sm:text-[17px] text-[#7a7a7a] tracking-[-0.224px]">
             Crea tu primer proyecto para comenzar a organizar tus tareas
           </p>
         </div>
@@ -39,7 +40,7 @@ async function ProjectsList({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
       {projects.map((project) => (
         <ProjectCard key={project._id.toString()} project={project} />
       ))}
@@ -49,21 +50,21 @@ async function ProjectsList({ userId }: { userId: string }) {
 
 function ProjectsLoading() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
       {[1, 2, 3, 4, 5, 6].map((i) => (
         <div
           key={i}
-          className="bg-white rounded-[18px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] p-6 animate-pulse"
+          className="bg-white rounded-lg border border-[#e0e0e0] p-4 sm:p-5 animate-pulse"
         >
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
-              <div className="h-6 bg-gray-200 rounded-lg w-3/4 mb-2" />
-              <div className="h-4 bg-gray-200 rounded-lg w-full" />
-              <div className="h-4 bg-gray-200 rounded-lg w-2/3 mt-1" />
+              <div className="h-5 bg-[#f5f5f7] rounded-lg w-3/4 mb-2" />
+              <div className="h-3 bg-[#f5f5f7] rounded-lg w-full" />
+              <div className="h-3 bg-[#f5f5f7] rounded-lg w-2/3 mt-1" />
             </div>
-            <div className="flex gap-4">
-              <div className="h-4 bg-gray-200 rounded-lg w-20" />
-              <div className="h-4 bg-gray-200 rounded-lg w-24" />
+            <div className="flex gap-3">
+              <div className="h-3 bg-[#f5f5f7] rounded-lg w-16" />
+              <div className="h-3 bg-[#f5f5f7] rounded-lg w-20" />
             </div>
           </div>
         </div>
@@ -80,15 +81,15 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
         {/* Header */}
-        <div className="mb-12">
-          <h1 className="text-5xl font-bold text-[#1d1d1f] mb-3 tracking-tight">
+        <div className="mb-4 sm:mb-5">
+          <h1 className="text-[20px] sm:text-[28px] lg:text-[34px] font-semibold text-[#1d1d1f] mb-1 tracking-tight leading-tight">
             Mis Proyectos
           </h1>
-          <p className="text-lg text-[#7a7a7a]">
-            Gestiona y organiza todos tus proyectos en un solo lugar
+          <p className="text-[12px] sm:text-[13px] text-[#7a7a7a] tracking-[-0.12px]">
+            Gestiona y organiza todos tus proyectos
           </p>
         </div>
 
@@ -96,7 +97,7 @@ export default async function DashboardPage() {
         <DashboardClient userId={session.user.id} userName={session.user.name} />
 
         {/* Lista de proyectos */}
-        <div className="mt-8">
+        <div className="mt-4 sm:mt-5">
           <Suspense fallback={<ProjectsLoading />}>
             <ProjectsList userId={session.user.id} />
           </Suspense>

@@ -271,6 +271,26 @@ components:
     textColor: "{colors.ink-muted-80}"
     typography: "{typography.fine-print}"
     padding: 64px
+mobile-first:
+  viewport:
+    maxWidth: 100vw
+    overflowX: hidden
+  containers:
+    padding: 16px (mobile) → 24px (tablet) → 32px (desktop)
+    maxWidth: 100%
+    boxSizing: border-box
+  responsive-breakpoints:
+    mobile: 0-640px
+    tablet: 640-1024px
+    desktop: 1024px+
+  layout-rules:
+    - All containers must have overflow-x-hidden
+    - Use min-w-0 on flex children to allow text truncation
+    - Use truncate class on long text elements
+    - Buttons should be full-width on mobile when appropriate
+    - Grid gaps should scale: gap-3 (mobile) → gap-4 (tablet) → gap-6 (desktop)
+    - Typography should scale responsively
+    - All interactive elements minimum 44x44px touch target
 ---
 
 ## Overview
@@ -474,6 +494,8 @@ Apple's whitespace is the product's pedestal. Every tile begins with at least 64
 **`environment-quote-card`** — A photographic-canvas hero specific to the environment page. Dark photographic backdrop (mountain vista at dawn) with `{colors.surface-tile-1}` as the fallback color, centered white-text headline in `{typography.display-lg}` (40px), small green "Apple 2030" pictographic logo above the headline, single `{component.button-primary}` below. Padding `{spacing.section}` (80px).
 
 **`floating-sticky-bar`** — Floats at the bottom of the viewport on the iPhone 17 Pro buy page during scroll. Background `{colors.canvas-parchment}` at 80% opacity with `backdrop-filter: blur(N)`, height 64px, padding 12px × 32px. Left: running price total in `{typography.body}`. Right: `{component.button-primary}` ("Add to Bag").
+
+**`modal-dialog`** — Centered overlay dialog for forms and detailed interactions. Background `{colors.canvas}` (white), rounded `{rounded.lg}` (18px), max-width 768px (2xl), max-height 90vh with scrollable content area. Header: 1px solid `{colors.hairline}` border-bottom, padding 12px × 20px, title in `{typography.body-strong}` (17px / 600 / -0.374px), close button with `{colors.ink-muted-48}` icon. Content area: padding 16px × 20px, scrollable overflow-y. Backdrop: black at 40% opacity with backdrop-blur. Form labels use `{typography.caption-strong}` (14px / 600 / -0.224px), inputs use `{typography.caption}` (14px / 400 / -0.224px), spacing between fields is 12px (space-y-3).
 
 ### Inputs & Forms
 

@@ -67,6 +67,14 @@ const TaskSchema = new Schema<ITask>(
       type: Number,
       default: 0,
     },
+    dueDate: {
+      type: Date,
+      default: null,
+    },
+    deliveryDate: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -77,7 +85,11 @@ const TaskSchema = new Schema<ITask>(
 TaskSchema.index({ projectId: 1, status: 1 });
 TaskSchema.index({ projectId: 1, order: 1 });
 
-const Task: Model<ITask> =
-  mongoose.models.Task || mongoose.model<ITask>('Task', TaskSchema);
+// Eliminar el modelo existente si existe para forzar recarga con nuevo schema
+if (mongoose.models.Task) {
+  delete mongoose.models.Task;
+}
+
+const Task: Model<ITask> = mongoose.model<ITask>('Task', TaskSchema);
 
 export default Task;

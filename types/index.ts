@@ -18,6 +18,7 @@ export interface IProject extends Document {
   description?: string;
   owner: Types.ObjectId;
   members: string[];
+  tags: ITag[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +40,8 @@ export interface ITask extends Document {
   imageUrl?: string;
   tags: ITag[];
   order: number;
+  dueDate?: Date | null;
+  deliveryDate?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -67,9 +70,13 @@ export type CreateTaskInput = {
   status?: 'todo' | 'in-progress' | 'done';
   assignedTo?: string[];
   tags?: ITag[];
+  dueDate?: string | null;
+  deliveryDate?: string | null;
 };
 
 export type UpdateTaskInput = Partial<CreateTaskInput> & {
   order?: number;
   imageUrl?: string;
+  dueDate?: string | null;
+  deliveryDate?: string | null;
 };

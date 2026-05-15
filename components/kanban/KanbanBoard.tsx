@@ -4,8 +4,11 @@ import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { ITask } from '@/types';
 import TaskCard from './TaskCard';
-import { moveTask } from '@/actions/task-actions';
+import { moveTask, deleteMultipleTasks } from '@/actions/task-actions';
 import { useRouter } from 'next/navigation';
+import { Trash2, X } from 'lucide-react';
+import Button from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface KanbanBoardProps {
   initialTasks: ITask[];
@@ -31,6 +34,10 @@ export default function KanbanBoard({ initialTasks, projectId }: KanbanBoardProp
     'in-progress': [],
     done: [],
   });
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Organizar tareas por estado
   useEffect(() => {
@@ -48,6 +55,10 @@ export default function KanbanBoard({ initialTasks, projectId }: KanbanBoardProp
     Object.keys(organized).forEach((status) => {
       organized[status as keyof TasksByStatus].sort((a, b) => a.order - b.order);
     });
+
+    // Limpiar selección si las tareas cambian
+    setSelectedTasks(new Set());
+    setSelectionMode(false);
 
     setTasks(organized);
   }, [initialTasks]);
@@ -101,22 +112,115 @@ export default function KanbanBoard({ initialTasks, projectId }: KanbanBoardProp
     }
   };
 
+  const handleToggleSelection = (taskId: string) => {
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    setSelectedTasks(newSelected);
+  };
+
+  const handleDeleteSelected = async () => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteMultipleTasks(Array.from(selectedTasks));
+      if (result.success) {
+        setShowDeleteDialog(false);
+        setSelectedTasks(new Set());
+        setSelectionMode(false);
+        router.refresh();
+      }
+    } catch (error) {
+      console.error('Error al eliminar tareas:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelSelection = () => {
+    setSelectedTasks(new Set());
+    setSelectionMode(false);
+  };
+
   return (
+    <>
+      {/* Botón para activar modo de selección */}
+      {!selectionMode && (
+        <div className="mb-3 flex justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setSelectionMode(true)}
+            className="text-[12px]"
+          >
+            Seleccionar tareas
+          </Button>
+        </div>
+      )}
+
+      {/* Barra de acciones flotante */}
+      {selectionMode && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 z-50 bg-white shadow-lg rounded-lg border border-[#e0e0e0] px-4 py-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+          <span className="text-[12px] sm:text-[14px] font-medium text-[#1d1d1f] tracking-[-0.12px] text-center sm:text-left">
+            {selectedTasks.size} {selectedTasks.size === 1 ? 'tarea' : 'tareas'}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleCancelSelection}
+              className="flex-1 sm:flex-none"
+            >
+              <X size={14} className="sm:mr-1" />
+              <span className="hidden sm:inline">Cancelar</span>
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={selectedTasks.size === 0}
+              className="flex-1 sm:flex-none"
+            >
+              <Trash2 size={14} className="sm:mr-1" />
+              Eliminar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Diálogo de confirmación */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDeleteSelected}
+        title="Eliminar Tareas"
+        message={
+          <p className="text-[#7a7a7a]">
+            ¿Estás seguro de que deseas eliminar <strong>{selectedTasks.size}</strong> {selectedTasks.size === 1 ? 'tarea' : 'tareas'}? Esta acción no se puede deshacer.
+          </p>
+        }
+        confirmText="Eliminar"
+        isLoading={isDeleting}
+        variant="danger"
+      />
+
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="flex flex-col md:grid md:grid-cols-3 gap-4 md:gap-6">
         {COLUMNS.map((column) => (
           <div key={column.id} className="flex flex-col">
             {/* Header de columna */}
-            <div className="mb-4">
+            <div className="mb-3">
               <div className="flex items-center gap-2 mb-2">
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="w-2.5 h-2.5 rounded-full"
                   style={{ backgroundColor: column.color }}
                 />
-                <h3 className="text-sm font-semibold text-[#1d1d1f] uppercase tracking-wide">
+                <h3 className="text-[12px] sm:text-[14px] font-semibold text-[#1d1d1f] uppercase tracking-wide">
                   {column.title}
                 </h3>
-                <span className="text-xs text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded-full">
+                <span className="text-[10px] sm:text-[12px] text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded-full tracking-[-0.08px]">
                   {tasks[column.id].length}
                 </span>
               </div>
@@ -128,14 +232,14 @@ export default function KanbanBoard({ initialTasks, projectId }: KanbanBoardProp
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`flex-1 space-y-3 p-3 rounded-2xl transition-colors min-h-[200px] ${
+                  className={`flex-1 space-y-2 sm:space-y-3 p-2 sm:p-3 rounded-lg transition-colors min-h-[120px] sm:min-h-[200px] ${
                     snapshot.isDraggingOver
-                      ? 'bg-[#0066cc]/5 ring-2 ring-[#0066cc]/20'
+                      ? 'bg-[#0066cc]/5 ring-1 ring-[#0066cc]/20'
                       : 'bg-transparent'
                   }`}
                 >
                   {tasks[column.id].length === 0 ? (
-                    <div className="flex items-center justify-center h-32 text-sm text-[#7a7a7a] border-2 border-dashed border-gray-200 rounded-xl">
+                    <div className="flex items-center justify-center h-20 sm:h-32 text-[12px] text-[#7a7a7a] border-2 border-dashed border-[#e0e0e0] rounded-lg tracking-[-0.12px]">
                       Sin tareas
                     </div>
                   ) : (
@@ -154,7 +258,12 @@ export default function KanbanBoard({ initialTasks, projectId }: KanbanBoardProp
                               snapshot.isDragging ? 'opacity-50 rotate-2' : ''
                             }`}
                           >
-                            <TaskCard task={task} />
+                            <TaskCard 
+                              task={task}
+                              selectionMode={selectionMode}
+                              isSelected={selectedTasks.has(task._id.toString())}
+                              onToggleSelection={handleToggleSelection}
+                            />
                           </div>
                         )}
                       </Draggable>
@@ -168,5 +277,6 @@ export default function KanbanBoard({ initialTasks, projectId }: KanbanBoardProp
         ))}
       </div>
     </DragDropContext>
+    </>
   );
 }

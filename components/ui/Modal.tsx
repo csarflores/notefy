@@ -33,28 +33,28 @@ export default function Modal({ isOpen, onClose, title, children, className }: M
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ type: 'spring', duration: 0.5 }}
+              transition={{ type: 'spring', duration: 0.3 }}
               className={cn(
-                'bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden',
+                'bg-white rounded-[18px] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden',
                 className
               )}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
               {title && (
-                <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-                  <h2 className="text-xl font-semibold text-[#1d1d1f]">{title}</h2>
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[#e0e0e0] shrink-0">
+                  <h2 className="text-[17px] font-semibold text-[#1d1d1f] tracking-[-0.374px]">{title}</h2>
                   <button
                     onClick={onClose}
-                    className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                    className="text-[#7a7a7a] hover:text-[#1d1d1f] transition-colors p-1.5 rounded-lg hover:bg-[#f5f5f7]"
                   >
-                    <X size={20} />
+                    <X size={18} />
                   </button>
                 </div>
               )}
 
-              {/* Content */}
-              <div className="px-6 py-5">{children}</div>
+              {/* Content - Scrollable */}
+              <div className="px-5 py-4 overflow-y-auto flex-1">{children}</div>
             </motion.div>
           </div>
         </Fragment>

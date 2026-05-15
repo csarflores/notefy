@@ -2,18 +2,19 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { getProjectById } from '@/actions/project-actions';
 import { getProjectTasks } from '@/actions/task-actions';
-import KanbanBoard from '@/components/kanban/KanbanBoard';
+import { getProjectUsers } from '@/actions/project-actions';
 import ProjectClient from './ProjectClient';
-import { Inbox } from 'lucide-react';
+import ProjectWithFilters from './ProjectWithFilters';
 
 interface ProjectPageProps {
   params: Promise<{ id: string }>;
 }
 
 async function ProjectContent({ projectId }: { projectId: string }) {
-  const [projectResult, tasksResult] = await Promise.all([
+  const [projectResult, tasksResult, usersResult] = await Promise.all([
     getProjectById(projectId),
     getProjectTasks(projectId),
+    getProjectUsers(projectId),
   ]);
 
   if (!projectResult.success || !projectResult.data) {
@@ -22,43 +23,31 @@ async function ProjectContent({ projectId }: { projectId: string }) {
 
   const project = projectResult.data;
   const tasks = tasksResult.success && tasksResult.data ? tasksResult.data : [];
+  const users = usersResult.success && usersResult.data ? usersResult.data : [];
+
+  console.log('📦 Project data:', project);
+  console.log('🏷️ Project tags from server:', project.tags);
 
   return (
     <>
       <ProjectClient project={project} />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {tasks.length === 0 ? (
-          // Estado vacío
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-24 h-24 rounded-full bg-[#f5f5f7] flex items-center justify-center mb-6">
-              <Inbox size={40} className="text-[#7a7a7a]" />
-            </div>
-            <h3 className="text-2xl font-semibold text-[#1d1d1f] mb-2">
-              No hay tareas aún
-            </h3>
-            <p className="text-[#7a7a7a] text-center max-w-md mb-6">
-              Comienza creando tu primera tarea para organizar el trabajo de este proyecto
-            </p>
-            <p className="text-sm text-[#7a7a7a]">
-              Haz clic en <span className="font-semibold text-[#0066cc]">Nueva Tarea</span> para empezar
-            </p>
-          </div>
-        ) : (
-          // Tablero Kanban
-          <KanbanBoard initialTasks={tasks} projectId={projectId} />
-        )}
-      </div>
+      <ProjectWithFilters 
+        tasks={tasks} 
+        projectId={projectId} 
+        projectUsers={users}
+        projectTags={project.tags || []}
+      />
     </>
   );
 }
 
 function ProjectLoading() {
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
+    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden">
       {/* Header skeleton */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="bg-white border-b border-gray-100 w-full">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse" />
@@ -76,7 +65,7 @@ function ProjectLoading() {
       </div>
 
       {/* Board skeleton */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="space-y-3">
@@ -105,7 +94,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const { id } = await params;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
+    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
       <Suspense fallback={<ProjectLoading />}>
         <ProjectContent projectId={id} />
       </Suspense>

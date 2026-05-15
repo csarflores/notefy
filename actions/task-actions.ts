@@ -82,6 +82,8 @@ export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITa
       assignedTo: data.assignedTo || [],
       tags: data.tags || [],
       order: newOrder,
+      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : null,
     });
 
     const populatedTask = await Task.findById(newTask._id)
@@ -123,6 +125,8 @@ export async function updateTask(
     if (data.tags !== undefined) task.tags = data.tags;
     if (data.order !== undefined) task.order = data.order;
     if (data.imageUrl !== undefined) task.imageUrl = data.imageUrl;
+    if (data.dueDate !== undefined) task.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    if (data.deliveryDate !== undefined) task.deliveryDate = data.deliveryDate ? new Date(data.deliveryDate) : null;
 
     await task.save();
 
@@ -248,5 +252,63 @@ export async function deleteTask(taskId: string): Promise<ApiResponse<null>> {
   } catch (error) {
     console.error('Error al eliminar tarea:', error);
     return { success: false, error: 'Error al eliminar la tarea' };
+  }
+}
+
+// Eliminar múltiples tareas
+export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiResponse<null>> {
+  try {
+    if (!taskIds || taskIds.length === 0) {
+      return { success: false, error: 'No se proporcionaron tareas para eliminar' };
+    }
+
+    // Validar todos los IDs
+    const invalidIds = taskIds.filter(id => !isValidObjectId(id));
+    if (invalidIds.length > 0) {
+      return { success: false, error: 'Algunos IDs de tarea son inválidos' };
+    }
+
+    await connectDB();
+
+    // Obtener las tareas para saber el proyecto
+    const tasks = await Task.find({ _id: { $in: taskIds } });
+
+    if (tasks.length === 0) {
+      return { success: false, error: 'No se encontraron tareas' };
+    }
+
+    const projectId = tasks[0].projectId;
+
+    // Eliminar todas las tareas
+    await Task.deleteMany({ _id: { $in: taskIds } });
+
+    // Reordenar todas las tareas del proyecto
+    const allTasks = await Task.find({ projectId }).sort({ status: 1, order: 1 });
+    
+    // Agrupar por estado y reordenar
+    const tasksByStatus: { [key: string]: any[] } = {
+      'todo': [],
+      'in-progress': [],
+      'done': []
+    };
+
+    allTasks.forEach(task => {
+      tasksByStatus[task.status].push(task);
+    });
+
+    // Actualizar el orden de cada grupo
+    for (const status in tasksByStatus) {
+      const statusTasks = tasksByStatus[status];
+      for (let i = 0; i < statusTasks.length; i++) {
+        await Task.findByIdAndUpdate(statusTasks[i]._id, { order: i });
+      }
+    }
+
+    revalidatePath(`/project/${projectId}`);
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al eliminar tareas:', error);
+    return { success: false, error: 'Error al eliminar las tareas' };
   }
 }

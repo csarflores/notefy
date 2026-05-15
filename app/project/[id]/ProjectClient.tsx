@@ -42,93 +42,104 @@ export default function ProjectClient({ project }: ProjectClientProps) {
   return (
     <>
       {/* Header del proyecto */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm w-full overflow-x-hidden">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               {/* Botón volver */}
               <button
                 onClick={() => router.push('/dashboard')}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
               >
-                <ArrowLeft size={20} className="text-[#7a7a7a]" />
+                <ArrowLeft size={18} className="text-[#7a7a7a]" />
               </button>
 
               {/* Información del proyecto */}
-              <div>
-                <h1 className="text-2xl font-bold text-[#1d1d1f] mb-1">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-[20px] sm:text-[24px] font-semibold text-[#1d1d1f] mb-0.5 tracking-tight truncate">
                   {project.name}
                 </h1>
                 {project.description && (
-                  <p className="text-sm text-[#7a7a7a]">{project.description}</p>
+                  <p className="text-[12px] sm:text-[13px] text-[#7a7a7a] tracking-[-0.12px] truncate">{project.description}</p>
                 )}
+
+                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] sm:text-[12px] text-[#7a7a7a]">
+                  <Users size={12} className="shrink-0" />
+                  <span>
+                    {project.members.length} miembro{project.members.length > 1 ? 's' : ''}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Acciones */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto z-10">
               {/* Botón invitar miembros */}
               <Button 
                 variant="secondary" 
-                size="md"
+                size="sm"
                 onClick={() => setIsInviteModalOpen(true)}
+                className="flex-1 sm:flex-none text-[13px] py-1.5"
               >
-                <Users size={18} className="mr-2" />
-                Invitar Miembros
+                <Users size={15} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">Invitar</span>
               </Button>
 
               {/* Botón nueva tarea */}
-              <Button onClick={() => setIsTaskModalOpen(true)} size="md">
-                <Plus size={18} className="mr-2" />
-                Nueva Tarea
+              <Button 
+                onClick={() => setIsTaskModalOpen(true)} 
+                size="sm"
+                className="flex-1 sm:flex-none text-[13px] py-1.5"
+              >
+                <Plus size={15} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">Nueva Tarea</span>
+                <span className="sm:hidden">Tarea</span>
               </Button>
 
               {/* Menú de opciones del proyecto */}
               <div className="relative">
                 <button
                   onClick={() => setShowProjectMenu(!showProjectMenu)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  <MoreVertical size={20} className="text-[#7a7a7a]" />
+                  <MoreVertical size={18} className="text-[#7a7a7a]" />
                 </button>
 
                 {showProjectMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-20">
-                    <button
-                      onClick={() => {
-                        setShowProjectMenu(false);
-                        setShowEditModal(true);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-[#1d1d1f] hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Edit2 size={14} />
-                      Editar Proyecto
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowProjectMenu(false);
-                        setShowDeleteDialog(true);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
-                    >
-                      <Trash2 size={14} />
-                      Eliminar Proyecto
-                    </button>
-                  </div>
+                  <>
+                    {/* Overlay para cerrar al hacer click fuera */}
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowProjectMenu(false)}
+                    />
+                    {/* Menú desplegable */}
+                    <div className="fixed right-4 top-16 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                      <button
+                        onClick={() => {
+                          setShowProjectMenu(false);
+                          setShowEditModal(true);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-[#1d1d1f] hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <Edit2 size={14} />
+                        Editar Proyecto
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowProjectMenu(false);
+                          setShowDeleteDialog(true);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
+                      >
+                        <Trash2 size={14} />
+                        Eliminar Proyecto
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
           </div>
-
-          {/* Miembros del proyecto */}
-          {project.members.length > 0 && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-[#7a7a7a]">
-              <Users size={16} />
-              <span>
-                {project.members.length} miembro{project.members.length > 1 ? 's' : ''} colaborando
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
