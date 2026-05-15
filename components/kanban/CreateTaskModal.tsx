@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
 import { createTask } from '@/actions/task-actions';
-import { getProjectUsers } from '@/actions/project-actions';
+import { getBoardUsers } from '@/actions/board-actions';
 import { getProjectTags } from '@/actions/tag-actions';
 import { ITag, IUser } from '@/types';
 import { X, Plus, Check } from 'lucide-react';
@@ -16,7 +16,7 @@ import { generateRandomColor } from '@/lib/utils';
 interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projectId: string;
+  projectId: string; // Still named projectId for compatibility, but used as boardId
   defaultStatus?: 'todo' | 'in-progress' | 'done';
 }
 
@@ -33,7 +33,7 @@ export default function CreateTaskModal({
   const [tags, setTags] = useState<ITag[]>([]);
   const [newTagText, setNewTagText] = useState('');
   const [assignedTo, setAssignedTo] = useState<string[]>([]);
-  const [projectUsers, setProjectUsers] = useState<IUser[]>([]);
+  const [boardUsers, setBoardUsers] = useState<IUser[]>([]);
   const [projectTags, setProjectTags] = useState<ITag[]>([]);
   const [dueDate, setDueDate] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
@@ -55,12 +55,12 @@ export default function CreateTaskModal({
 
   const loadProjectData = async () => {
     const [usersResult, tagsResult] = await Promise.all([
-      getProjectUsers(projectId),
+      getBoardUsers(projectId),
       getProjectTags(projectId),
     ]);
 
     if (usersResult.success && usersResult.data) {
-      setProjectUsers(usersResult.data);
+      setBoardUsers(usersResult.data);
     }
 
     if (tagsResult.success && tagsResult.data) {
@@ -127,7 +127,7 @@ export default function CreateTaskModal({
       const result = await createTask({
         title: title.trim(),
         description: description.trim(),
-        projectId,
+        boardId: projectId,
         status,
         tags,
         assignedTo,
@@ -269,7 +269,7 @@ export default function CreateTaskModal({
             Asignar a
           </label>
           <div className="flex flex-wrap gap-1.5">
-            {projectUsers.map((user) => (
+            {boardUsers.map((user) => (
               <button
                 key={user._id.toString()}
                 type="button"

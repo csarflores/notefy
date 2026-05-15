@@ -124,7 +124,7 @@ export async function updateProject(
     }
 
     revalidatePath('/dashboard');
-    revalidatePath(`/project/${projectId}`);
+    revalidatePath(`/parent-project/${projectId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(updatedProject)) };
   } catch (error) {
@@ -133,7 +133,7 @@ export async function updateProject(
   }
 }
 
-// Eliminar un proyecto
+// Eliminar un proyecto (los tableros quedan sin proyecto)
 export async function deleteProject(projectId: string): Promise<ApiResponse<null>> {
   try {
     if (!isValidObjectId(projectId)) {
@@ -142,15 +142,19 @@ export async function deleteProject(projectId: string): Promise<ApiResponse<null
 
     await connectDB();
 
-    // Eliminar todas las tareas del proyecto
-    await Task.deleteMany({ projectId });
-
-    // Eliminar el proyecto
-    const deletedProject = await Project.findByIdAndDelete(projectId);
-
-    if (!deletedProject) {
+    const project = await Project.findById(projectId);
+    if (!project) {
       return { success: false, error: 'Proyecto no encontrado' };
     }
+
+    // Actualizar tableros para que queden sin proyecto
+    const Board = (await import('@/models/Board')).default;
+    await Board.updateMany(
+      { projectId: projectId },
+      { $set: { projectId: null } }
+    );
+
+    await Project.findByIdAndDelete(projectId);
 
     revalidatePath('/dashboard');
 
@@ -295,3 +299,4 @@ export async function getProjectUsers(
     return { success: false, error: 'Error al obtener los usuarios' };
   }
 }
+

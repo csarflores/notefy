@@ -1,23 +1,6 @@
 import mongoose, { Schema, Model } from 'mongoose';
 import { IProject } from '@/types';
 
-const TagSchema = new Schema(
-  {
-    text: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: [30, 'El texto del tag no puede exceder 30 caracteres'],
-    },
-    color: {
-      type: String,
-      required: true,
-      match: [/^#[0-9A-F]{6}$/i, 'El color debe ser un código hexadecimal válido'],
-    },
-  },
-  { _id: false }
-);
-
 const ProjectSchema = new Schema<IProject>(
   {
     name: {
@@ -46,16 +29,6 @@ const ProjectSchema = new Schema<IProject>(
         message: 'Todos los miembros deben tener emails válidos',
       },
     },
-    tags: {
-      type: [TagSchema],
-      default: [],
-      validate: {
-        validator: function (tags: any[]) {
-          return tags.length <= 20;
-        },
-        message: 'No puedes agregar más de 20 tags al proyecto',
-      },
-    },
   },
   {
     timestamps: true,
@@ -65,7 +38,11 @@ const ProjectSchema = new Schema<IProject>(
 // Índice para búsquedas por propietario
 ProjectSchema.index({ owner: 1 });
 
-const Project: Model<IProject> =
-  mongoose.models.Project || mongoose.model<IProject>('Project', ProjectSchema);
+// Eliminar el modelo existente si existe para forzar recarga con nuevo schema
+if (mongoose.models.Project) {
+  delete mongoose.models.Project;
+}
+
+const Project: Model<IProject> = mongoose.model<IProject>('Project', ProjectSchema);
 
 export default Project;

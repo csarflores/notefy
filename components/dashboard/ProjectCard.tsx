@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Users, Calendar, MoreVertical, Edit2, Trash2, Lock } from 'lucide-react';
-import Avatar from '@/components/ui/Avatar';
+import { Folder, MoreVertical, Edit2, Trash2, ChevronRight } from 'lucide-react';
 import EditProjectModal from './EditProjectModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { deleteProject } from '@/actions/project-actions';
@@ -13,18 +12,17 @@ import { formatDate } from '@/lib/utils';
 
 interface ProjectCardProps {
   project: IProject;
+  boardCount: number;
+  onBoardDrop?: (boardId: string, projectId: string) => void;
 }
 
-export default function ProjectCard({ project }: ProjectCardProps) {
+export default function ProjectCard({ project, boardCount, onBoardDrop }: ProjectCardProps) {
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleClick = () => {
-    router.push(`/project/${project._id}`);
-  };
+  const [isOver, setIsOver] = useState(false);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -46,29 +44,62 @@ export default function ProjectCard({ project }: ProjectCardProps) {
     setShowEditModal(true);
   };
 
-  const members = project.members;
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setIsOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsOver(false);
+    
+    const boardId = e.dataTransfer.getData('boardId');
+    if (boardId && onBoardDrop) {
+      onBoardDrop(boardId, project._id.toString());
+    }
+  };
 
   return (
     <>
-    <div className="bg-white rounded-lg p-3 sm:p-3.5 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group">
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-0.5 tracking-[-0.32px] truncate">
-            {project.name}
-          </h3>
-          {project.description && (
-            <p className="text-[12px] text-[#7a7a7a] line-clamp-1 tracking-[-0.12px]">
-              {project.description}
-            </p>
-          )}
+    {/* Tarjeta de Proyecto - Diseño distintivo con gradiente y más prominente */}
+    <div 
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`bg-gradient-to-br from-[#0066cc] to-[#0052a3] rounded-xl p-4 sm:p-5 shadow-md hover:shadow-lg transition-all duration-200 relative group ${
+        isOver ? 'ring-4 ring-white ring-opacity-50 scale-105' : ''
+      }`}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          {/* Ícono de carpeta */}
+          <div className="p-2.5 bg-white/10 rounded-lg backdrop-blur-sm shrink-0">
+            <Folder size={20} className="text-white" />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[17px] font-bold text-white mb-1 tracking-[-0.32px] truncate">
+              {project.name}
+            </h3>
+            {project.description && (
+              <p className="text-[13px] text-white/80 line-clamp-2 tracking-[-0.12px]">
+                {project.description}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="relative shrink-0 ml-2">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="p-1 rounded-lg hover:bg-[#f5f5f7] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
           >
-            <MoreVertical size={15} className="text-[#7a7a7a]" />
+            <MoreVertical size={16} className="text-white" />
           </button>
 
           {showMenu && (
@@ -95,33 +126,25 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         </div>
       </div>
 
-      {/* Miembros */}
-      {members.length > 0 ? (
-        <div className="flex items-center gap-1 mb-2">
-          <Users size={12} className="text-[#7a7a7a]" />
-          <span className="text-[11px] text-[#7a7a7a] tracking-[-0.08px]">
-            {members.length} {members.length === 1 ? 'miembro' : 'miembros'}
+      {/* Contador de tableros */}
+      <div className="flex items-center justify-between pt-3 border-t border-white/20">
+        <div className="flex items-center gap-2">
+          <div className="px-3 py-1.5 bg-white/15 backdrop-blur-sm rounded-lg">
+            <span className="text-[13px] font-semibold text-white tracking-[-0.12px]">
+              {boardCount} {boardCount === 1 ? 'Tablero' : 'Tableros'}
+            </span>
+          </div>
+          <span className="text-[11px] text-white/70 tracking-[-0.08px]">
+            {formatDate(project.updatedAt)}
           </span>
         </div>
-      ) : (
-        <div className="flex items-center gap-1 mb-2">
-          <Lock size={12} className="text-[#7a7a7a]" />
-          <span className="text-[11px] text-[#7a7a7a] tracking-[-0.08px]">
-            Proyecto privado
-          </span>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-2 border-t border-[#e0e0e0]">
-        <span className="text-[10px] text-[#7a7a7a] tracking-[-0.08px]">
-          {formatDate(project.updatedAt)}
-        </span>
+        
         <Link
           href={`/project/${project._id}`}
-          className="text-[12px] font-medium text-[#0066cc] hover:text-[#0071e3] transition-colors tracking-[-0.12px]"
+          className="flex items-center gap-1 text-[13px] font-medium text-white hover:text-white/80 transition-colors tracking-[-0.12px]"
         >
-          Ver proyecto →
+          Ver tableros
+          <ChevronRight size={14} />
         </Link>
       </div>
     </div>
@@ -145,7 +168,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
             ¿Estás seguro de que deseas eliminar el proyecto <strong>"{project.name}"</strong>?
           </p>
           <p className="text-sm text-red-500">
-            Esta acción eliminará permanentemente el proyecto y todas sus tareas.
+            Esta acción eliminará permanentemente el proyecto, sus {boardCount} tablero{boardCount === 1 ? '' : 's'} y todas sus tareas.
           </p>
         </div>
       }

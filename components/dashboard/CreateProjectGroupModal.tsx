@@ -6,13 +6,13 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { createProject } from '@/actions/project-actions';
 
-interface CreateProjectModalProps {
+interface CreateProjectGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
 }
 
-export default function CreateProjectModal({ isOpen, onClose, userId }: CreateProjectModalProps) {
+export default function CreateProjectGroupModal({ isOpen, onClose, userId }: CreateProjectGroupModalProps) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -34,6 +34,7 @@ export default function CreateProjectModal({ isOpen, onClose, userId }: CreatePr
       const result = await createProject(userId, {
         name: name.trim(),
         description: description.trim(),
+        parentId: null,
       });
 
       if (result.success) {
@@ -65,15 +66,15 @@ export default function CreateProjectModal({ isOpen, onClose, userId }: CreatePr
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Nombre del proyecto */}
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-[#1d1d1f] mb-2">
+          <label htmlFor="project-name" className="block text-sm font-medium text-[#1d1d1f] mb-2">
             Nombre del proyecto
           </label>
           <input
-            id="name"
+            id="project-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ej: Marketing 2026"
+            placeholder="Ej: Empresa 1"
             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/20 outline-none transition-all text-[#1d1d1f] placeholder:text-gray-400"
             disabled={isLoading}
             autoFocus
@@ -82,11 +83,11 @@ export default function CreateProjectModal({ isOpen, onClose, userId }: CreatePr
 
         {/* Descripción */}
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-[#1d1d1f] mb-2">
+          <label htmlFor="project-description" className="block text-sm font-medium text-[#1d1d1f] mb-2">
             Descripción (opcional)
           </label>
           <textarea
-            id="description"
+            id="project-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Describe brevemente el proyecto..."
@@ -94,6 +95,12 @@ export default function CreateProjectModal({ isOpen, onClose, userId }: CreatePr
             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/20 outline-none transition-all text-[#1d1d1f] placeholder:text-gray-400 resize-none"
             disabled={isLoading}
           />
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-[12px] text-blue-800">
+            💡 Los proyectos agrupan varios tableros. Después de crear el proyecto, podrás arrastrar tableros hacia él.
+          </p>
         </div>
 
         {/* Error */}

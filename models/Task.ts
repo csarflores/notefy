@@ -39,10 +39,10 @@ const TaskSchema = new Schema<ITask>(
       },
       default: 'todo',
     },
-    projectId: {
+    boardId: {
       type: Schema.Types.ObjectId,
-      ref: 'Project',
-      required: [true, 'El proyecto es requerido'],
+      ref: 'Board',
+      required: [true, 'El tablero es requerido'],
     },
     assignedTo: {
       type: [Schema.Types.ObjectId],
@@ -82,8 +82,8 @@ const TaskSchema = new Schema<ITask>(
 );
 
 // Índices para búsquedas optimizadas
-TaskSchema.index({ projectId: 1, status: 1 });
-TaskSchema.index({ projectId: 1, order: 1 });
+TaskSchema.index({ boardId: 1, status: 1 });
+TaskSchema.index({ boardId: 1, order: 1 });
 
 // Eliminar el modelo existente si existe para forzar recarga con nuevo schema
 if (mongoose.models.Task) {

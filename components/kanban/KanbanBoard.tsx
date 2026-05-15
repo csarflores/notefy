@@ -12,7 +12,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface KanbanBoardProps {
   initialTasks: ITask[];
-  projectId: string;
+  boardId: string;
 }
 
 type TasksByStatus = {
@@ -27,7 +27,7 @@ const COLUMNS = [
   { id: 'done' as const, title: 'Finalizado', color: '#34c759' },
 ];
 
-export default function KanbanBoard({ initialTasks, projectId }: KanbanBoardProps) {
+export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps) {
   const router = useRouter();
   const [tasks, setTasks] = useState<TasksByStatus>({
     todo: [],

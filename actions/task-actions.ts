@@ -6,16 +6,16 @@ import Task from '@/models/Task';
 import { CreateTaskInput, UpdateTaskInput, ApiResponse, ITask } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
 
-// Obtener todas las tareas de un proyecto
-export async function getProjectTasks(projectId: string): Promise<ApiResponse<ITask[]>> {
+// Obtener todas las tareas de un tablero
+export async function getBoardTasks(boardId: string): Promise<ApiResponse<ITask[]>> {
   try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    if (!isValidObjectId(boardId)) {
+      return { success: false, error: 'ID de tablero inválido' };
     }
 
     await connectDB();
 
-    const tasks = await Task.find({ projectId })
+    const tasks = await Task.find({ boardId })
       .sort({ order: 1, createdAt: -1 })
       .populate('assignedTo', 'name email image')
       .lean();
@@ -29,17 +29,17 @@ export async function getProjectTasks(projectId: string): Promise<ApiResponse<IT
 
 // Obtener tareas por estado
 export async function getTasksByStatus(
-  projectId: string,
+  boardId: string,
   status: 'todo' | 'in-progress' | 'done'
 ): Promise<ApiResponse<ITask[]>> {
   try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    if (!isValidObjectId(boardId)) {
+      return { success: false, error: 'ID de tablero inválido' };
     }
 
     await connectDB();
 
-    const tasks = await Task.find({ projectId, status })
+    const tasks = await Task.find({ boardId, status })
       .sort({ order: 1, createdAt: -1 })
       .populate('assignedTo', 'name email image')
       .lean();
@@ -58,15 +58,15 @@ export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITa
       return { success: false, error: 'El título es requerido' };
     }
 
-    if (!isValidObjectId(data.projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    if (!isValidObjectId(data.boardId)) {
+      return { success: false, error: 'ID de tablero inválido' };
     }
 
     await connectDB();
 
     // Obtener el orden más alto en la columna
     const lastTask = await Task.findOne({
-      projectId: data.projectId,
+      boardId: data.boardId,
       status: data.status || 'todo',
     })
       .sort({ order: -1 })
@@ -77,7 +77,7 @@ export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITa
     const newTask = await Task.create({
       title: data.title.trim(),
       description: data.description?.trim() || '',
-      projectId: data.projectId,
+      boardId: data.boardId,
       status: data.status || 'todo',
       assignedTo: data.assignedTo || [],
       tags: data.tags || [],
@@ -90,7 +90,7 @@ export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITa
       .populate('assignedTo', 'name email image')
       .lean();
 
-    revalidatePath(`/project/${data.projectId}`);
+    revalidatePath(`/project/${data.boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(populatedTask)) };
   } catch (error) {
@@ -134,7 +134,7 @@ export async function updateTask(
       .populate('assignedTo', 'name email image')
       .lean();
 
-    revalidatePath(`/project/${task.projectId}`);
+    revalidatePath(`/project/${task.boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(updatedTask)) };
   } catch (error) {
@@ -168,13 +168,13 @@ export async function moveTask(
     if (oldStatus !== newStatus) {
       // Actualizar orden de tareas en la columna antigua
       await Task.updateMany(
-        { projectId: task.projectId, status: oldStatus, order: { $gt: task.order } },
+        { boardId: task.boardId, status: oldStatus, order: { $gt: task.order } },
         { $inc: { order: -1 } }
       );
 
       // Actualizar orden de tareas en la nueva columna
       await Task.updateMany(
-        { projectId: task.projectId, status: newStatus, order: { $gte: newOrder } },
+        { boardId: task.boardId, status: newStatus, order: { $gte: newOrder } },
         { $inc: { order: 1 } }
       );
     } else {
@@ -182,7 +182,7 @@ export async function moveTask(
       if (newOrder > task.order) {
         await Task.updateMany(
           {
-            projectId: task.projectId,
+            boardId: task.boardId,
             status: newStatus,
             order: { $gt: task.order, $lte: newOrder },
           },
@@ -191,7 +191,7 @@ export async function moveTask(
       } else if (newOrder < task.order) {
         await Task.updateMany(
           {
-            projectId: task.projectId,
+            boardId: task.boardId,
             status: newStatus,
             order: { $gte: newOrder, $lt: task.order },
           },
@@ -209,7 +209,7 @@ export async function moveTask(
       .populate('assignedTo', 'name email image')
       .lean();
 
-    revalidatePath(`/project/${task.projectId}`);
+    revalidatePath(`/project/${task.boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(updatedTask)) };
   } catch (error) {
@@ -233,7 +233,7 @@ export async function deleteTask(taskId: string): Promise<ApiResponse<null>> {
       return { success: false, error: 'Tarea no encontrada' };
     }
 
-    const projectId = task.projectId;
+    const projectId = task.boardId;
     const status = task.status;
     const order = task.order;
 
@@ -242,7 +242,7 @@ export async function deleteTask(taskId: string): Promise<ApiResponse<null>> {
 
     // Reordenar las tareas restantes
     await Task.updateMany(
-      { projectId, status, order: { $gt: order } },
+      { boardId: projectId, status, order: { $gt: order } },
       { $inc: { order: -1 } }
     );
 
@@ -277,13 +277,13 @@ export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiRespons
       return { success: false, error: 'No se encontraron tareas' };
     }
 
-    const projectId = tasks[0].projectId;
+    const boardId = tasks[0].boardId;
 
     // Eliminar todas las tareas
     await Task.deleteMany({ _id: { $in: taskIds } });
 
-    // Reordenar todas las tareas del proyecto
-    const allTasks = await Task.find({ projectId }).sort({ status: 1, order: 1 });
+    // Reordenar todas las tareas del tablero
+    const allTasks = await Task.find({ boardId }).sort({ status: 1, order: 1 });
     
     // Agrupar por estado y reordenar
     const tasksByStatus: { [key: string]: any[] } = {
@@ -304,7 +304,7 @@ export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiRespons
       }
     }
 
-    revalidatePath(`/project/${projectId}`);
+    revalidatePath(`/project/${boardId}`);
 
     return { success: true, data: null };
   } catch (error) {

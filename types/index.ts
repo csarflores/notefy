@@ -11,14 +11,26 @@ export interface IUser extends Document {
   updatedAt: Date;
 }
 
-// Tipos para Project
+// Tipos para Project (agrupa tableros, no tiene tareas directamente)
 export interface IProject extends Document {
   _id: Types.ObjectId;
   name: string;
   description?: string;
   owner: Types.ObjectId;
   members: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Tipos para Board (tablero que contiene tareas)
+export interface IBoard extends Document {
+  _id: Types.ObjectId;
+  name: string;
+  description?: string;
+  owner: Types.ObjectId;
+  members: string[];
   tags: ITag[];
+  projectId?: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,7 +47,7 @@ export interface ITask extends Document {
   title: string;
   description?: string;
   status: 'todo' | 'in-progress' | 'done';
-  projectId: Types.ObjectId;
+  boardId: Types.ObjectId;
   assignedTo: Types.ObjectId[];
   imageUrl?: string;
   tags: ITag[];
@@ -53,7 +65,7 @@ export type ApiResponse<T> = {
   error?: string;
 };
 
-// Tipos para formularios
+// Tipos para formularios de Project
 export type CreateProjectInput = {
   name: string;
   description?: string;
@@ -63,10 +75,22 @@ export type UpdateProjectInput = Partial<CreateProjectInput> & {
   members?: string[];
 };
 
+// Tipos para formularios de Board
+export type CreateBoardInput = {
+  name: string;
+  description?: string;
+  projectId?: string | null;
+};
+
+export type UpdateBoardInput = Partial<CreateBoardInput> & {
+  members?: string[];
+  projectId?: string | null;
+};
+
 export type CreateTaskInput = {
   title: string;
   description?: string;
-  projectId: string;
+  boardId: string;
   status?: 'todo' | 'in-progress' | 'done';
   assignedTo?: string[];
   tags?: ITag[];

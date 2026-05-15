@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, LogOut, User } from 'lucide-react';
+import { Plus, LogOut, User, Folder } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import Button from '@/components/ui/Button';
 import CreateProjectModal from '@/components/dashboard/CreateProjectModal';
+import CreateBoardModal from '@/components/dashboard/CreateBoardModal';
+import CreateProjectGroupModal from '@/components/dashboard/CreateProjectGroupModal';
 
 interface DashboardClientProps {
   userId: string;
@@ -12,7 +14,8 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({ userId, userName }: DashboardClientProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBoardModalOpen, setIsBoardModalOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/auth/login' });
@@ -22,15 +25,24 @@ export default function DashboardClient({ userId, userName }: DashboardClientPro
     <>
       {/* Mobile-first header */}
       <div className="flex flex-col max-w-full sm:flex-row sm:items-center sm:justify-between gap-2">
-        {/* Botón Nuevo Proyecto - Visible solo en desktop */}
-        <Button
-          onClick={() => setIsModalOpen(true)}
-          size="sm"
-          className="hidden sm:inline-flex"
-        >
-          <Plus size={15} className="mr-1.5" />
-          Nuevo Proyecto
-        </Button>
+        {/* Botones de creación - Visible solo en desktop */}
+        <div className="hidden sm:flex gap-2">
+          <Button
+            onClick={() => setIsProjectModalOpen(true)}
+            size="sm"
+            variant="secondary"
+          >
+            <Folder size={15} className="mr-1.5" />
+            Nuevo Proyecto
+          </Button>
+          <Button
+            onClick={() => setIsBoardModalOpen(true)}
+            size="sm"
+          >
+            <Plus size={15} className="mr-1.5" />
+            Nuevo Tablero
+          </Button>
+        </div>
 
         {/* Usuario y acciones - Stack en mobile, row en desktop */}
         <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
@@ -52,20 +64,37 @@ export default function DashboardClient({ userId, userName }: DashboardClientPro
           </Button>
         </div>
 
-        {/* Botón Nuevo Proyecto - Visible solo en mobile, full width */}
-        <Button
-          onClick={() => setIsModalOpen(true)}
-          size="sm"
-          className="sm:hidden w-full"
-        >
-          <Plus size={15} className="mr-1.5" />
-          Nuevo Proyecto
-        </Button>
+        {/* Botones - Visible solo en mobile, full width */}
+        <div className="sm:hidden flex flex-col gap-2 w-full">
+          <Button
+            onClick={() => setIsProjectModalOpen(true)}
+            size="sm"
+            variant="secondary"
+            className="w-full"
+          >
+            <Folder size={15} className="mr-1.5" />
+            Nuevo Proyecto
+          </Button>
+          <Button
+            onClick={() => setIsBoardModalOpen(true)}
+            size="sm"
+            className="w-full"
+          >
+            <Plus size={15} className="mr-1.5" />
+            Nuevo Tablero
+          </Button>
+        </div>
       </div>
 
-      <CreateProjectModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+      <CreateBoardModal
+        isOpen={isBoardModalOpen}
+        onClose={() => setIsBoardModalOpen(false)}
+        userId={userId}
+      />
+
+      <CreateProjectGroupModal
+        isOpen={isProjectModalOpen}
+        onClose={() => setIsProjectModalOpen(false)}
         userId={userId}
       />
     </>
