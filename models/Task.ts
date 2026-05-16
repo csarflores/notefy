@@ -29,7 +29,7 @@ const TaskSchema = new Schema<ITask>(
     description: {
       type: String,
       trim: true,
-      maxlength: [2000, 'La descripción no puede exceder 2000 caracteres'],
+      maxlength: [50000, 'La descripción no puede exceder 50000 caracteres (incluye etiquetas HTML del editor de texto rico)'],
     },
     status: {
       type: String,

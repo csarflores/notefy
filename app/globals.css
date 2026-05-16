@@ -46,3 +46,130 @@ body {
   overflow-x: hidden;
   width: 100%;
 }
+
+/* TipTap Code Block Syntax Highlighting */
+.ProseMirror {
+  outline: none;
+  min-height: 200px;
+}
+
+.ProseMirror > * {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror p {
+  margin: 0.5em 0;
+}
+
+/* Code blocks */
+.ProseMirror pre {
+  color: #c9d1d9;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  margin: 1rem 0;
+  overflow-x: auto;
+  padding: 1rem;
+}
+
+.ProseMirror pre code {
+  display: block;
+  font-size: 0.875rem;
+}
+
+/* Inline code */
+.ProseMirror code {
+  background: #f6f8fa;
+  border-radius: 0.25rem;
+  color: #d73a49;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875em;
+  padding: 0.2em 0.4em;
+}
+
+.ProseMirror p code {
+  background: #f6f8fa;
+  border-radius: 0.25rem;
+  color: #d73a49;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875em;
+  padding: 0.2em 0.4em;
+}
+
+/* Style paragraphs that look like code blocks (workaround for malformed HTML) */
+.ProseMirror p:has(code) {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 0.5rem;
+  color: #c9d1d9;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  margin: 1rem 0;
+  padding: 1rem;
+}
+
+/* Syntax highlighting colors */
+.hljs-keyword {
+  color: #569cd6;
+}
+
+.hljs-string {
+  color: #ce9178;
+}
+
+.hljs-number {
+  color: #b5cea8;
+}
+
+.hljs-comment {
+  color: #6a9955;
+}
+
+.hljs-function {
+  color: #dcdcaa;
+}
+
+.hljs-variable {
+  color: #9cdcfe;
+}
+
+.hljs-type {
+  color: #4ec9b0;
+}
+
+.hljs-class {
+  color: #4ec9b0;
+}
+
+.hljs-property {
+  color: #9cdcfe;
+}
+
+.hljs-operator {
+  color: #d4d4d4;
+}
+
+.hljs-punctuation {
+  color: #d4d4d4;
+}
+
+.hljs-tag {
+  color: #569cd6;
+}
+
+.hljs-attr {
+  color: #9cdcfe;
+}
+
+.hljs-value {
+  color: #ce9178;
+}
+
+/* Link styling */
+.ProseMirror a {
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ProseMirror a:hover {
+  color: #1d4ed8;
+}

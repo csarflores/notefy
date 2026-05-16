@@ -129,6 +129,12 @@ export default function CreateTaskModal({
       return;
     }
 
+    // Check description length (HTML includes formatting tags)
+    if (description.length > 50000) {
+      setError('La descripción excede el límite de 50,000 caracteres. El editor de texto rico incluye etiquetas HTML de formato, negritas, enlaces, etc., que aumentan el conteo de caracteres. Intenta reducir el contenido o eliminar formato excesivo.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -372,6 +378,8 @@ export default function CreateTaskModal({
               onChange={setDescription}
               editable={true}
               placeholder="Descripción de la tarea..."
+              maxLength={50000}
+              showCharCount={true}
             />
           </div>
         </div>
