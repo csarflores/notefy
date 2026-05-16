@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button';
 import { INote } from '@/types';
 import { updateNote, deleteNote } from '@/actions/note-actions';
 import { useNotification } from '@/components/ui/NotificationContext';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export function NoteEditorClient({ note, userId }: { note: INote; userId: string }) {
   const router = useRouter();
@@ -16,6 +17,7 @@ export function NoteEditorClient({ note, userId }: { note: INote; userId: string
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -36,9 +38,10 @@ export function NoteEditorClient({ note, userId }: { note: INote; userId: string
   };
 
   const handleDelete = async () => {
-    if (!confirm('¿Estás seguro de que quieres eliminar esta nota?')) {
-      return;
-    }
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
       const result = await deleteNote(note._id.toString(), userId);
@@ -144,6 +147,17 @@ export function NoteEditorClient({ note, userId }: { note: INote; userId: string
           />
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Eliminar nota"
+        message="¿Estás seguro de que quieres eliminar esta nota?"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </>
   );
 }

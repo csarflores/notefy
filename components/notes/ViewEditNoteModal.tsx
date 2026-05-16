@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button';
 import { INote } from '@/types';
 import { updateNote, deleteNote, shareNote, removeNoteMember } from '@/actions/note-actions';
 import { useNotification } from '@/components/ui/NotificationContext';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 interface ViewEditNoteModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   // Actualizar el contenido cuando la nota cambia
   useEffect(() => {
@@ -105,9 +107,10 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
   };
 
   const handleDelete = async () => {
-    if (!confirm('¿Estás seguro de que quieres eliminar esta nota?')) {
-      return;
-    }
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
       const result = await deleteNote(note._id.toString(), userId);
@@ -269,6 +272,16 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
           </div>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Eliminar nota"
+        message="¿Estás seguro de que quieres eliminar esta nota?"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   );
 }
