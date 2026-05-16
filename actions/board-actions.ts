@@ -398,8 +398,6 @@ export async function createBoardFromProject(projectId: string): Promise<ApiResp
       );
     }
 
-    console.log(`✅ Convertido project "${project.name}" a board con ${tasks.length} tasks`);
-
     return { success: true, data: JSON.parse(JSON.stringify(board)) };
   } catch (error) {
     console.error('Error al convertir project a board:', error);

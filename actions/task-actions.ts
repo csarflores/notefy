@@ -90,7 +90,7 @@ export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITa
       .populate('assignedTo', 'name email image')
       .lean();
 
-    revalidatePath(`/project/${data.boardId}`);
+    revalidatePath(`/board/${data.boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(populatedTask)) };
   } catch (error) {
@@ -134,7 +134,7 @@ export async function updateTask(
       .populate('assignedTo', 'name email image')
       .lean();
 
-    revalidatePath(`/project/${task.boardId}`);
+    revalidatePath(`/board/${task.boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(updatedTask)) };
   } catch (error) {
@@ -209,7 +209,7 @@ export async function moveTask(
       .populate('assignedTo', 'name email image')
       .lean();
 
-    revalidatePath(`/project/${task.boardId}`);
+    revalidatePath(`/board/${task.boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(updatedTask)) };
   } catch (error) {
@@ -246,7 +246,7 @@ export async function deleteTask(taskId: string): Promise<ApiResponse<null>> {
       { $inc: { order: -1 } }
     );
 
-    revalidatePath(`/project/${projectId}`);
+    revalidatePath(`/board/${projectId}`);
 
     return { success: true, data: null };
   } catch (error) {
@@ -304,7 +304,7 @@ export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiRespons
       }
     }
 
-    revalidatePath(`/project/${boardId}`);
+    revalidatePath(`/board/${boardId}`);
 
     return { success: true, data: null };
   } catch (error) {

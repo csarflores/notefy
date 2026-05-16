@@ -55,8 +55,6 @@ async function BoardContent({ boardId }: { boardId: string }) {
                 { boardId: project._id }
               );
             }
-
-            console.log(`✅ Converted project "${project.name}" to board with ${tasks.length} tasks`);
           }
 
           // Try to get the board again

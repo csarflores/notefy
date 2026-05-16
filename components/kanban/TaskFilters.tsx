@@ -23,8 +23,6 @@ export default function TaskFilters({
   projectTags = []
 }: TaskFiltersProps) {
   const [showFilters, setShowFilters] = useState(false);
-  
-  console.log('🏷️ Project Tags:', projectTags);
 
   const filters = [
     { id: 'all', label: 'Todas', icon: null },
