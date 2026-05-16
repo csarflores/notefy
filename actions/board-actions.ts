@@ -130,7 +130,12 @@ export async function getBoardUsers(
 
     const allUsers = [owner, ...members];
 
-    return { success: true, data: JSON.parse(JSON.stringify(allUsers)) };
+    // Filtrar usuarios duplicados por _id
+    const uniqueUsers = allUsers.filter((user, index, self) =>
+      index === self.findIndex((u) => u._id.toString() === user._id.toString())
+    );
+
+    return { success: true, data: JSON.parse(JSON.stringify(uniqueUsers)) };
   } catch (error) {
     console.error('Error al obtener usuarios del tablero:', error);
     return { success: false, error: 'Error al obtener los usuarios' };
