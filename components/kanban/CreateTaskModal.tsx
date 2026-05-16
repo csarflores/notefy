@@ -55,6 +55,12 @@ export default function CreateTaskModal({
     }
   }, [isOpen, projectId]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setStatus(defaultStatus);
+    }
+  }, [isOpen, defaultStatus]);
+
   const loadProjectData = async () => {
     const [usersResult, tagsResult] = await Promise.all([
       getBoardUsers(projectId),

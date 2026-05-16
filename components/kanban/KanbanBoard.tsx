@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { ITask } from '@/types';
 import TaskCard from './TaskCard';
+import CreateTaskModal from './CreateTaskModal';
 import { moveTask, deleteMultipleTasks } from '@/actions/task-actions';
 import { useRouter } from 'next/navigation';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, Plus } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
@@ -38,6 +39,8 @@ export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps)
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [defaultStatus, setDefaultStatus] = useState<'todo' | 'in-progress' | 'done'>('todo');
 
   // Organizar tareas por estado
   useEffect(() => {
@@ -212,17 +215,29 @@ export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps)
           <div key={column.id} className="flex flex-col">
             {/* Header de columna */}
             <div className="mb-3">
-              <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: column.color }}
-                />
-                <h3 className="text-[12px] sm:text-[14px] font-semibold text-[#1d1d1f] uppercase tracking-wide">
-                  {column.title}
-                </h3>
-                <span className="text-[10px] sm:text-[12px] text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded-full tracking-[-0.08px]">
-                  {tasks[column.id].length}
-                </span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: column.color }}
+                  />
+                  <h3 className="text-[12px] sm:text-[14px] font-semibold text-[#1d1d1f] uppercase tracking-wide">
+                    {column.title}
+                  </h3>
+                  <span className="text-[10px] sm:text-[12px] text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded-full tracking-[-0.08px]">
+                    {tasks[column.id].length}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setDefaultStatus(column.id);
+                    setShowCreateModal(true);
+                  }}
+                  className="p-1 hover:bg-[#f5f5f7] rounded-full transition-colors"
+                  title="Crear nueva tarea"
+                >
+                  <Plus size={16} className="text-[#7a7a7a]" />
+                </button>
               </div>
             </div>
 
@@ -277,6 +292,13 @@ export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps)
         ))}
       </div>
     </DragDropContext>
+
+    <CreateTaskModal
+      isOpen={showCreateModal}
+      onClose={() => setShowCreateModal(false)}
+      projectId={boardId}
+      defaultStatus={defaultStatus}
+    />
     </>
   );
 }
