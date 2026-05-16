@@ -30,9 +30,12 @@ async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; us
   const allBoards = boardsResult.data || [];
   const allNotes = notesResult.data || [];
 
+  // Filtrar notas: solo mostrar notas que NO están en un proyecto
+  const unassignedNotes = allNotes.filter((note) => !note.projectId);
+
   // Obtener información del owner de cada nota
   const notesWithOwnerInfo = await Promise.all(
-    allNotes.map(async (note) => {
+    unassignedNotes.map(async (note) => {
       const ownerResult = await getUserById(note.owner.toString());
       if (ownerResult.success && ownerResult.data) {
         return {
@@ -49,7 +52,7 @@ async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; us
     })
   );
 
-  if (allProjects.length === 0 && allBoards.length === 0 && allNotes.length === 0) {
+  if (allProjects.length === 0 && allBoards.length === 0 && unassignedNotes.length === 0) {
     return (
       <div className="text-center py-12 sm:py-16">
         <div className="max-w-md mx-auto px-4">
