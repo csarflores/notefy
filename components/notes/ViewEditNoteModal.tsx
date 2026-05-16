@@ -7,6 +7,7 @@ import { Trash2, Lock, Users, Save, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { INote } from '@/types';
 import { updateNote, deleteNote, shareNote, removeNoteMember } from '@/actions/note-actions';
+import { useNotification } from '@/components/ui/NotificationContext';
 
 interface ViewEditNoteModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface ViewEditNoteModalProps {
 
 export default function ViewEditNoteModal({ isOpen, onClose, note, userId, ownerEmail, ownerName }: ViewEditNoteModalProps) {
   const router = useRouter();
+  const { showNotification } = useNotification();
   const [content, setContent] = useState(note.content);
   const [visibility, setVisibility] = useState<'private' | 'shared'>(note.visibility as 'private' | 'shared');
   const [memberEmail, setMemberEmail] = useState('');
@@ -44,10 +46,10 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
       });
       if (result.success) {
       } else {
-        alert(result.error || 'Error al guardar la nota');
+        showNotification(result.error || 'Error al guardar la nota', 'error');
       }
     } catch (error) {
-      alert('Error al guardar la nota');
+      showNotification('Error al guardar la nota', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -65,20 +67,20 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
             setVisibility('shared');
           }
         } else {
-          alert(result.error || 'Error al compartir la nota');
+          showNotification(result.error || 'Error al compartir la nota', 'error');
         }
       } catch (error) {
-        alert('Error al compartir la nota');
+        showNotification('Error al compartir la nota', 'error');
       } finally {
         setIsSharing(false);
       }
     } else {
       if (!memberEmail) {
-        alert('Por favor ingresa un email');
+        showNotification('Por favor ingresa un email', 'error');
       } else if (!/^\S+@\S+\.\S+$/.test(memberEmail)) {
-        alert('Email inválido');
+        showNotification('Email inválido', 'error');
       } else if (members.includes(memberEmail)) {
-        alert('El usuario ya tiene acceso a esta nota');
+        showNotification('El usuario ya tiene acceso a esta nota', 'error');
       }
     }
   };
@@ -93,10 +95,10 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
           setVisibility('private');
         }
       } else {
-        alert(result.error || 'Error al eliminar el miembro');
+        showNotification(result.error || 'Error al eliminar el miembro', 'error');
       }
     } catch (error) {
-      alert('Error al eliminar el miembro');
+      showNotification('Error al eliminar el miembro', 'error');
     } finally {
       setIsSharing(false);
     }
@@ -110,14 +112,14 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
     try {
       const result = await deleteNote(note._id.toString(), userId);
       if (result.success) {
-        alert('Nota eliminada');
+        showNotification('Nota eliminada', 'success');
         onClose();
         router.refresh();
       } else {
-        alert(result.error || 'Error al eliminar la nota');
+        showNotification(result.error || 'Error al eliminar la nota', 'error');
       }
     } catch (error) {
-      alert('Error al eliminar la nota');
+      showNotification('Error al eliminar la nota', 'error');
     } finally {
       setIsDeleting(false);
     }

@@ -7,9 +7,11 @@ import { ArrowLeft, Trash2, Lock, Users, Edit2, Save } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { INote } from '@/types';
 import { updateNote, deleteNote } from '@/actions/note-actions';
+import { useNotification } from '@/components/ui/NotificationContext';
 
 export function NoteEditorClient({ note, userId }: { note: INote; userId: string }) {
   const router = useRouter();
+  const { showNotification } = useNotification();
   const [content, setContent] = useState(note.content);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -24,10 +26,10 @@ export function NoteEditorClient({ note, userId }: { note: INote; userId: string
       if (result.success) {
         setIsEditing(false);
       } else {
-        alert(result.error || 'Error al guardar la nota');
+        showNotification(result.error || 'Error al guardar la nota', 'error');
       }
     } catch (error) {
-      alert('Error al guardar la nota');
+      showNotification('Error al guardar la nota', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -41,13 +43,13 @@ export function NoteEditorClient({ note, userId }: { note: INote; userId: string
     try {
       const result = await deleteNote(note._id.toString(), userId);
       if (result.success) {
-        alert('Nota eliminada');
+        showNotification('Nota eliminada', 'success');
         router.push(note.projectId ? `/parent-project/${note.projectId}` : '/dashboard');
       } else {
-        alert(result.error || 'Error al eliminar la nota');
+        showNotification(result.error || 'Error al eliminar la nota', 'error');
       }
     } catch (error) {
-      alert('Error al eliminar la nota');
+      showNotification('Error al eliminar la nota', 'error');
     } finally {
       setIsDeleting(false);
     }

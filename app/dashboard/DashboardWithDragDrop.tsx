@@ -8,6 +8,7 @@ import ViewEditNoteModal from '@/components/notes/ViewEditNoteModal';
 import { IProject, IBoard, INote } from '@/types';
 import { updateBoard } from '@/actions/board-actions';
 import { useState } from 'react';
+import { useNotification } from '@/components/ui/NotificationContext';
 
 interface DashboardWithDragDropProps {
   projects: Array<{ item: IProject; childCount: number }>;
@@ -23,6 +24,7 @@ export default function DashboardWithDragDrop({
   userId
 }: DashboardWithDragDropProps) {
   const router = useRouter();
+  const { showNotification } = useNotification();
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedNote, setSelectedNote] = useState<INote | null>(null);
   const [selectedOwnerEmail, setSelectedOwnerEmail] = useState<string>('');
@@ -41,11 +43,11 @@ export default function DashboardWithDragDrop({
       if (result.success) {
         router.refresh();
       } else {
-        alert(result.error || 'Error al mover el tablero');
+        showNotification(result.error || 'Error al mover el tablero', 'error');
       }
     } catch (error) {
       console.error('Error al mover tablero:', error);
-      alert('Error al mover el tablero');
+      showNotification('Error al mover el tablero', 'error');
     } finally {
       setIsUpdating(false);
     }

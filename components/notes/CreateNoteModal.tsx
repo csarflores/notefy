@@ -7,6 +7,7 @@ import { Lock, Users, Save, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { createNote, shareNote } from '@/actions/note-actions';
 import { CreateNoteInput } from '@/types';
+import { useNotification } from '@/components/ui/NotificationContext';
 
 interface CreateNoteModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export default function CreateNoteModal({
   ownerName,
 }: CreateNoteModalProps) {
   const router = useRouter();
+  const { showNotification } = useNotification();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [visibility, setVisibility] = useState<'private' | 'shared'>('private');
@@ -36,7 +38,7 @@ export default function CreateNoteModal({
 
   const handleSave = async () => {
     if (!title.trim()) {
-      alert('Por favor ingresa un título');
+      showNotification('Por favor ingresa un título', 'error');
       return;
     }
 
@@ -67,10 +69,10 @@ export default function CreateNoteModal({
         onClose();
         router.refresh();
       } else {
-        alert(result.error || 'Error al crear la nota');
+        showNotification(result.error || 'Error al crear la nota', 'error');
       }
     } catch (error) {
-      alert('Error al crear la nota');
+      showNotification('Error al crear la nota', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -85,11 +87,11 @@ export default function CreateNoteModal({
       }
     } else {
       if (!memberEmail) {
-        alert('Por favor ingresa un email');
+        showNotification('Por favor ingresa un email', 'error');
       } else if (!/^\S+@\S+\.\S+$/.test(memberEmail)) {
-        alert('Email inválido');
+        showNotification('Email inválido', 'error');
       } else if (members.includes(memberEmail)) {
-        alert('El usuario ya tiene acceso a esta nota');
+        showNotification('El usuario ya tiene acceso a esta nota', 'error');
       }
     }
   };
