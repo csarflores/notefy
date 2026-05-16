@@ -34,7 +34,6 @@ export default function CreateProjectGroupModal({ isOpen, onClose, userId }: Cre
       const result = await createProject(userId, {
         name: name.trim(),
         description: description.trim(),
-        parentId: null,
       });
 
       if (result.success) {

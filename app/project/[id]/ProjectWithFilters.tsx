@@ -140,7 +140,7 @@ export default function ProjectWithFilters({
               </p>
             </div>
           ) : (
-            <KanbanBoard initialTasks={filteredTasks} projectId={projectId} />
+            <KanbanBoard initialTasks={filteredTasks} boardId={projectId} />
           )}
         </>
       )}

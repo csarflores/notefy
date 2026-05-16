@@ -127,19 +127,19 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-2.5 bg-white rounded-xl shadow-sm border border-[#e0e0e0]/50">
-                  <Logo className="h-8 w-8" />
-                </div>
-                <div className="h-px bg-linear-to-r from-[#e0e0e0] to-transparent flex-1 max-w-[200px]" />
-              </div>
-              <h1 className="text-[24px] sm:text-[32px] lg:text-[40px] font-bold text-[#1d1d1f] mb-2 tracking-tight leading-tight">
+        <div className="mb-12">
+          <div className="flex items-center justify-between gap-4">
+            {/* Logo a la izquierda */}
+            <div className="p-2.5 bg-white rounded-xl shadow-sm border border-[#e0e0e0]/50 shrink-0">
+              <Logo className="h-8 w-8" />
+            </div>
+            
+            {/* Título y subtítulo a la derecha */}
+            <div className="text-right flex-1">
+              <h1 className="text-[20px] sm:text-[28px] lg:text-[32px] font-bold text-[#1d1d1f] mb-1 tracking-tight leading-tight">
                 Dashboard
               </h1>
-              <p className="text-[14px] sm:text-[16px] text-[#6b7280] leading-relaxed max-w-lg">
+              <p className="text-[13px] sm:text-[15px] text-[#6b7280] leading-relaxed">
                 Gestiona tus proyectos y tableros en un solo lugar
               </p>
             </div>

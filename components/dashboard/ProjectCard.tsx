@@ -67,39 +67,39 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
   return (
     <>
     {/* Tarjeta de Proyecto - Diseño distintivo con gradiente y más prominente */}
-    <div 
+    <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`bg-linear-to-br from-[#0066cc] to-[#0052a3] rounded-xl p-4 sm:p-5 shadow-md hover:shadow-lg transition-all duration-200 relative group ${
+      className={`bg-linear-to-br from-[#0066cc] to-[#0052a3] rounded-lg p-3 shadow-md hover:shadow-lg transition-all duration-200 relative group ${
         isOver ? 'ring-4 ring-white ring-opacity-50 scale-105' : ''
       }`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
           {/* Ícono de carpeta */}
-          <div className="p-2.5 bg-white/10 rounded-lg backdrop-blur-sm shrink-0">
-            <Folder size={20} className="text-white" />
+          <div className="p-1.5 bg-white/10 rounded-lg backdrop-blur-sm shrink-0">
+            <Folder size={16} className="text-white" />
           </div>
-          
+
           <div className="flex-1 min-w-0">
-            <h3 className="text-[17px] font-bold text-white mb-1 tracking-[-0.32px] truncate">
+            <h3 className="text-[14px] font-bold text-white mb-0.5 tracking-[-0.32px] truncate">
               {project.name}
             </h3>
             {project.description && (
-              <p className="text-[13px] text-white/80 line-clamp-2 tracking-[-0.12px]">
+              <p className="text-[11px] text-white/80 line-clamp-1 tracking-[-0.12px]">
                 {project.description}
               </p>
             )}
           </div>
         </div>
 
-        <div className="relative shrink-0 ml-2">
+        <div className="relative shrink-0 ml-1.5">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="p-1 rounded-lg hover:bg-white/10 transition-colors"
           >
-            <MoreVertical size={16} className="text-white" />
+            <MoreVertical size={14} className="text-white" />
           </button>
 
           {showMenu && (
@@ -127,24 +127,24 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
       </div>
 
       {/* Contador de tableros */}
-      <div className="flex items-center justify-between pt-3 border-t border-white/20">
-        <div className="flex items-center gap-2">
-          <div className="px-3 py-1.5 bg-white/15 backdrop-blur-sm rounded-lg">
-            <span className="text-[13px] font-semibold text-white tracking-[-0.12px]">
+      <div className="flex items-center justify-between pt-2 border-t border-white/20">
+        <div className="flex items-center gap-1.5">
+          <div className="px-2 py-1 bg-white/15 backdrop-blur-sm rounded-lg">
+            <span className="text-[11px] font-semibold text-white tracking-[-0.12px]">
               {boardCount} {boardCount === 1 ? 'Tablero' : 'Tableros'}
             </span>
           </div>
-          <span className="text-[11px] text-white/70 tracking-[-0.08px]">
+          <span className="text-[10px] text-white/70 tracking-[-0.08px]">
             {formatDate(project.updatedAt)}
           </span>
         </div>
-        
+
         <Link
           href={`/project/${project._id}`}
-          className="flex items-center gap-1 text-[13px] font-medium text-white hover:text-white/80 transition-colors tracking-[-0.12px]"
+          className="flex items-center gap-1 text-[11px] font-medium text-white hover:text-white/80 transition-colors tracking-[-0.12px]"
         >
           Ver tableros
-          <ChevronRight size={14} />
+          <ChevronRight size={12} />
         </Link>
       </div>
     </div>

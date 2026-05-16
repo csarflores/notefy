@@ -8,96 +8,88 @@ notefy/
 │   ├── layout.tsx               # Layout raíz con providers
 │   ├── page.tsx                 # Página principal (landing/auth)
 │   ├── globals.css              # Estilos globales + Tailwind
-│   ├── dashboard/               # Dashboard multiproyecto
+│   ├── dashboard/               # Dashboard principal
 │   │   ├── page.tsx            # Lista de proyectos, tableros y notas
-│   │   └── layout.tsx          # Layout del dashboard
-│   ├── notes/                   # Vistas de notas
-│   │   └── [id]/               # Nota específica (dinámico)
-│   │       ├── page.tsx        # Vista y edición de nota
-│   │       └── NoteEditorClient.tsx  # Componente cliente de edición
-│   ├── parent-project/          # Vistas de proyectos
-│   │   └── [id]/               # Proyecto específico (dinámico)
-│   │       ├── page.tsx        # Tableros y notas del proyecto
-│   │       └── ParentProjectClient.tsx  # Componente cliente
-│   ├── project/                 # Vistas de proyecto (legacy)
-│   │   └── [id]/               # Proyecto específico (dinámico)
-│   │       ├── page.tsx        # Tablero Kanban
-│   │       └── settings/       # Configuración del proyecto
-│   │           └── page.tsx
-│   └── api/                     # API Routes (si no se usan Server Actions)
-│       ├── auth/               # NextAuth endpoints
-│       └── projects/           # Endpoints REST opcionales
+│   │   ├── DashboardClient.tsx  # Componente cliente del dashboard
+│   │   └── DashboardWithDragDrop.tsx  # Componente con drag & drop
+│   ├── board/                   # Vistas de tableros Kanban
+│   │   └── [id]/               # Tablero específico (dinámico)
+│   │       └── page.tsx        # Vista del tablero
+│   ├── auth/                    # Autenticación
+│   │   ├── login/              # Página de login
+│   │   │   └── page.tsx
+│   │   └── register/           # Página de registro
+│   │       └── page.tsx
+│   └── api/                     # API Routes (NextAuth)
+│       └── auth/               # NextAuth endpoints
 ├── components/                   # Componentes React
-│   ├── ui/                      # Componentes atómicos estilo Apple
-│   │   ├── Button.tsx          # Botón principal (pill style)
-│   │   ├── Card.tsx            # Tarjeta con glassmorphism
-│   │   ├── Badge.tsx           # Badge para tags
-│   │   └── Input.tsx           # Input con estilo Apple
-│   ├── kanban/                  # Componentes del Kanban
-│   │   ├── Board.tsx           # Tablero completo
-│   │   ├── Column.tsx          # Columna (todo/in-progress/done)
-│   │   └── TaskCard.tsx        # Tarjeta de tarea
 │   ├── dashboard/               # Componentes del dashboard
+│   │   ├── BoardCard.tsx       # Tarjeta de tablero
+│   │   ├── CreateBoardModal.tsx  # Modal para crear tableros
+│   │   ├── CreateProjectGroupModal.tsx  # Modal para crear grupos
 │   │   └── ProjectCard.tsx     # Tarjeta de proyecto
-│   └── notes/                   # Componentes de notas
-│       ├── NoteEditor.tsx      # Editor de texto rico (Tiptap)
-│       ├── NoteCard.tsx        # Tarjeta de nota
-│       └── CreateNoteModal.tsx # Modal para crear notas
+│   ├── kanban/                  # Componentes del Kanban
+│   │   ├── KanbanBoard.tsx     # Tablero Kanban completo
+│   │   ├── CreateTaskModal.tsx  # Modal para crear tareas
+│   │   ├── EditTaskModal.tsx   # Modal para editar tareas
+│   │   └── TaskCard.tsx        # Tarjeta de tarea
+│   ├── notes/                   # Componentes de notas
+│   │   ├── NoteCard.tsx        # Tarjeta de nota
+│   │   ├── NoteEditor.tsx      # Editor de texto rico
+│   │   └── CreateNoteModal.tsx # Modal para crear notas
+│   └── project/                # Componentes de proyectos
+│       └── InviteMemberModal.tsx  # Modal para invitar miembros
 ├── lib/                         # Utilidades y configuraciones
+│   ├── auth.ts                 # Configuración de NextAuth
+│   ├── mongodb-client.ts       # Cliente MongoDB
 │   ├── mongodb.ts              # Singleton de conexión MongoDB
-│   ├── cloudinary.ts           # Configuración de Cloudinary
 │   └── utils.ts                # Funciones auxiliares
 ├── models/                      # Esquemas de Mongoose
-│   ├── User.ts                 # Modelo de usuario
-│   ├── Project.ts              # Modelo de proyecto
 │   ├── Board.ts                # Modelo de tablero
-│   ├── Task.ts                 # Modelo de tarea
-│   └── Note.ts                 # Modelo de nota
+│   ├── Note.ts                 # Modelo de nota
+│   ├── Project.ts              # Modelo de proyecto
+│   └── Task.ts                 # Modelo de tarea
 ├── actions/                     # Server Actions de Next.js 15
 │   ├── auth-actions.ts         # Acciones de autenticación
-│   ├── project-actions.ts      # Acciones de proyectos
 │   ├── board-actions.ts        # Acciones de tableros
-│   ├── tag-actions.ts          # Acciones de etiquetas
-│   └── note-actions.ts         # Acciones de notas
+│   ├── note-actions.ts         # Acciones de notas
+│   └── project-actions.ts      # Acciones de proyectos
 ├── types/                       # Tipos TypeScript compartidos
-│   └── index.ts                # Definiciones de tipos
+│   ├── index.ts                # Definiciones de tipos principales
+│   └── next-auth.d.ts          # Tipos de NextAuth
+├── scripts/                     # Scripts de utilidad
+│   └── migrate-projects-to-boards.ts  # Script de migración
 ├── public/                      # Archivos estáticos
-│   └── images/                 # Imágenes y assets
 └── .ai/                         # Documentación para IA
-    ├── INSTRUCTIONS.md         # Reglas de desarrollo
+    ├── AGENTS.md               # Reglas de Next.js 15
     ├── ARCHITECTURE.md         # Este archivo
-    ├── SCHEMA.md               # Esquemas de datos
-    └── DESIGN.md               # Sistema de diseño Apple
+    ├── DESIGN.md               # Sistema de diseño Apple
+    ├── INSTRUCTIONS.md         # Reglas de desarrollo
+    ├── PROMPT_CONTEXT.md       # Contexto para Claude
+    └── SCHEMA.md               # Esquemas de datos
 
 ## Flujo de Datos
 
-1. **Autenticación:** NextAuth.js maneja login/logout
-2. **Dashboard:** Lista proyectos, tableros y notas del usuario desde MongoDB
-3. **Kanban:** Carga tareas por tablero con Server Actions
-4. **Notas:** Carga notas del usuario y de proyectos con Server Actions
-5. **Editor de Notas:** Editor de texto rico (Tiptap) con actualización en tiempo real
-6. **Drag & Drop:** Actualización optimista + Server Action para persistir
-7. **Imágenes:** Upload a Cloudinary, URL guardada en MongoDB (pendiente para notas)
+1. **Autenticación:** NextAuth.js maneja login/logout con configuración en `lib/auth.ts`
+2. **Dashboard:** Lista proyectos, tableros y notas del usuario desde MongoDB usando Server Actions
+3. **Tableros Kanban:** Carga tareas por tablero con Server Actions, soporta drag & drop con `@hello-pangea/dnd`
+4. **Notas:** Carga notas del usuario y de proyectos con Server Actions, editor de texto rico
+5. **Drag & Drop:** Actualización optimista + Server Action para persistir cambios de orden
+6. **Colaboración:** Sistema de miembros por email para proyectos, tableros y notas compartidas
 
-## Modelos de Datos
+## Jerarquía de Datos
 
-### Note (Nota)
-- **title:** Título de la nota
-- **content:** Contenido en HTML (del editor Tiptap)
-- **visibility:** 'private' | 'shared'
-- **owner:** Usuario propietario
-- **members:** Array de emails (para notas compartidas)
-- **projectId:** Referencia opcional a Project (null si no está en proyecto)
-
-**Tipos de Notas:**
-- **Privadas:** Solo visible para el owner (incluso si está en un proyecto)
-- **Compartidas:** Visible para owner + members (pueden editar)
-- **En Proyecto:** Asociada a un proyecto, pero puede ser privada o compartida
+- **Project** (Proyecto): Contenedor principal para agrupar tableros y notas
+- **Board** (Tablero): Tablero Kanban con tareas, puede pertenecer a un proyecto o ser independiente
+- **Task** (Tarea): Tareas dentro de un tablero con estado (todo/in-progress/done)
+- **Note** (Nota): Notas con editor de texto rico, pueden ser privadas o compartidas, pueden estar en proyectos
 
 ## Convenciones
 
-- **Server Components por defecto:** Usar `'use client'` solo cuando sea necesario
-- **Server Actions:** Preferir sobre API Routes para mutaciones
-- **Tipado estricto:** Todo debe tener tipos TypeScript
+- **Server Components por defecto:** Usar `'use client'` solo cuando sea necesario (interactividad, drag & drop, forms)
+- **Server Actions:** Preferir sobre API Routes para todas las mutaciones (CRUD)
+- **Tipado estricto:** Todo debe tener tipos TypeScript, usar interfaces en `types/index.ts`
 - **Nombres de archivos:** kebab-case para carpetas, PascalCase para componentes
-- **Estilos:** Tailwind CSS con tokens del sistema de diseño Apple
+- **Estilos:** Tailwind CSS con tokens del sistema de diseño Apple (DESIGN.md)
+- **Validación:** Validación en modelos Mongoose y en componentes del frontend
+- **Idioma:** UI en español, variables y comentarios en inglés

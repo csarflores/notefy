@@ -33,29 +33,29 @@ export default function NoteCard({ note, onOpenNote, isOwner = true }: NoteCardP
     <div
       onClick={onOpenNote}
       className={cn(
-        'bg-white border border-gray-200 rounded-xl p-5 cursor-pointer',
+        'bg-white border border-gray-200 rounded-lg p-3 cursor-pointer',
         'hover:border-blue-300 hover:shadow-lg transition-all duration-200',
         'group'
       )}
     >
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors">
+      <div className="flex items-start justify-between mb-2">
+        <h3 className="text-[13px] font-semibold text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors">
           {note.title}
         </h3>
-        <div className="flex items-center gap-2 ml-2">
+        <div className="flex items-center gap-1 ml-2">
           {note.visibility === 'private' ? (
-            <Lock className="w-4 h-4 text-gray-400" />
+            <Lock className="w-3 h-3 text-gray-400" />
           ) : (
-            <Users className="w-4 h-4 text-blue-500" />
+            <Users className="w-3 h-3 text-blue-500" />
           )}
         </div>
       </div>
 
-      <p className="text-gray-600 text-sm mb-4 line-clamp-3 min-h-[60px]">
+      <p className="text-gray-600 text-[11px] mb-2.5 line-clamp-2 min-h-[36px]">
         {preview || 'Sin contenido'}
       </p>
 
-      <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="flex items-center justify-between text-[10px] text-gray-500">
         <div className="flex items-center gap-1">
           <Calendar className="w-3 h-3" />
           <span>{timeAgo}</span>

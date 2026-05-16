@@ -60,32 +60,32 @@ export default function BoardCard({ board }: BoardCardProps) {
 
   return (
     <>
-    <div 
+    <div
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      className={`bg-white rounded-lg p-3 sm:p-3.5 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group cursor-move ${
+      className={`bg-white rounded-lg p-2.5 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group cursor-move ${
         isDragging ? 'opacity-50 scale-95' : ''
       }`}
     >
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-start justify-between mb-1.5">
         <div className="flex-1 min-w-0">
-          <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-0.5 tracking-[-0.32px] truncate">
+          <h3 className="text-[13px] font-semibold text-[#1d1d1f] mb-0.5 tracking-[-0.32px] truncate">
             {board.name}
           </h3>
           {board.description && (
-            <p className="text-[12px] text-[#7a7a7a] line-clamp-1 tracking-[-0.12px]">
+            <p className="text-[11px] text-[#7a7a7a] line-clamp-1 tracking-[-0.12px]">
               {board.description}
             </p>
           )}
         </div>
 
-        <div className="relative shrink-0 ml-2">
+        <div className="relative shrink-0 ml-1.5">
           <button
             onClick={() => setShowMenu(!showMenu)}
             className="p-1 rounded-lg hover:bg-[#f5f5f7] transition-colors"
           >
-            <MoreVertical size={15} className="text-[#7a7a7a]" />
+            <MoreVertical size={13} className="text-[#7a7a7a]" />
           </button>
 
           {showMenu && (
@@ -114,29 +114,29 @@ export default function BoardCard({ board }: BoardCardProps) {
 
       {/* Miembros */}
       {members.length > 0 ? (
-        <div className="flex items-center gap-1 mb-2">
-          <Users size={12} className="text-[#7a7a7a]" />
-          <span className="text-[11px] text-[#7a7a7a] tracking-[-0.08px]">
+        <div className="flex items-center gap-1 mb-1.5">
+          <Users size={11} className="text-[#7a7a7a]" />
+          <span className="text-[10px] text-[#7a7a7a] tracking-[-0.08px]">
             {members.length} {members.length === 1 ? 'miembro' : 'miembros'}
           </span>
         </div>
       ) : (
-        <div className="flex items-center gap-1 mb-2">
-          <Lock size={12} className="text-[#7a7a7a]" />
-          <span className="text-[11px] text-[#7a7a7a] tracking-[-0.08px]">
+        <div className="flex items-center gap-1 mb-1.5">
+          <Lock size={11} className="text-[#7a7a7a]" />
+          <span className="text-[10px] text-[#7a7a7a] tracking-[-0.08px]">
             Tablero privado
           </span>
         </div>
       )}
 
       {/* Footer */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-2 border-t border-[#e0e0e0]">
-        <span className="text-[10px] text-[#7a7a7a] tracking-[-0.08px]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-1.5 border-t border-[#e0e0e0]">
+        <span className="text-[9px] text-[#7a7a7a] tracking-[-0.08px]">
           {formatDate(board.updatedAt)}
         </span>
         <Link
           href={`/board/${board._id}`}
-          className="text-[12px] font-medium text-[#0066cc] hover:text-[#0071e3] transition-colors tracking-[-0.12px]"
+          className="text-[11px] font-medium text-[#0066cc] hover:text-[#0071e3] transition-colors tracking-[-0.12px]"
         >
           Ver tablero →
         </Link>

@@ -59,33 +59,14 @@ export default function DashboardWithDragDrop({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Notas */}
-      {notes.length > 0 && (
-        <div>
-          <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-3 tracking-[-0.24px]">
-            Notas
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
-            {notes.map(({ note, ownerEmail, ownerName }) => (
-              <NoteCard
-                key={note._id.toString()}
-                note={note}
-                onOpenNote={() => handleNoteClick(note, ownerEmail, ownerName)}
-                isOwner={true}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
+    <div className="space-y-4">
       {/* Proyectos */}
       {projects.length > 0 && (
         <div>
-          <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-3 tracking-[-0.24px]">
+          <h2 className="text-[14px] font-semibold text-[#1d1d1f] mb-2 tracking-[-0.24px]">
             Proyectos
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
             {projects.map(({ item, childCount }) => (
               <ProjectCard
                 key={item._id.toString()}
@@ -101,17 +82,36 @@ export default function DashboardWithDragDrop({
       {/* Tableros sin proyecto */}
       {unassignedBoards.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-3">
-            <h2 className="text-[15px] font-semibold text-[#1d1d1f] tracking-[-0.24px]">
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-[14px] font-semibold text-[#1d1d1f] tracking-[-0.24px]">
               Tableros
             </h2>
-            <span className="text-[11px] text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded-full">
+            <span className="text-[10px] text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded-full">
               Arrastra tableros a un proyecto para organizarlos
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
             {unassignedBoards.map(({ item }) => (
               <BoardCard key={item._id.toString()} board={item} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Notas */}
+      {notes.length > 0 && (
+        <div>
+          <h2 className="text-[14px] font-semibold text-[#1d1d1f] mb-2 tracking-[-0.24px]">
+            Notas
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
+            {notes.map(({ note, ownerEmail, ownerName }) => (
+              <NoteCard
+                key={note._id.toString()}
+                note={note}
+                onOpenNote={() => handleNoteClick(note, ownerEmail, ownerName)}
+                isOwner={true}
+              />
             ))}
           </div>
         </div>
