@@ -58,6 +58,19 @@ export interface ITask extends Document {
   updatedAt: Date;
 }
 
+// Tipos para Note
+export interface INote extends Document {
+  _id: Types.ObjectId;
+  title: string;
+  content: string;
+  visibility: 'private' | 'shared';
+  owner: Types.ObjectId;
+  members: string[];
+  projectId?: Types.ObjectId | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Tipos para respuestas de API
 export type ApiResponse<T> = {
   success: boolean;
@@ -103,4 +116,16 @@ export type UpdateTaskInput = Partial<CreateTaskInput> & {
   imageUrl?: string;
   dueDate?: string | null;
   deliveryDate?: string | null;
+};
+
+// Tipos para formularios de Note
+export type CreateNoteInput = {
+  title: string;
+  content: string;
+  visibility?: 'private' | 'shared';
+  projectId?: string | null;
+};
+
+export type UpdateNoteInput = Partial<CreateNoteInput> & {
+  members?: string[];
 };

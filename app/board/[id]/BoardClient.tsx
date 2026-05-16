@@ -46,7 +46,7 @@ export default function BoardClient({ board }: BoardClientProps) {
             <div className="flex items-center gap-3 min-w-0 flex-1">
               {/* Botón volver */}
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push(board.projectId ? `/parent-project/${board.projectId}` : '/dashboard')}
                 className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
               >
                 <ArrowLeft size={18} className="text-[#7a7a7a]" />

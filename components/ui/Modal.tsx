@@ -11,9 +11,10 @@ interface ModalProps {
   title?: string;
   children: ReactNode;
   className?: string;
+  headerContent?: ReactNode;
 }
 
-export default function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, className, headerContent }: ModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -41,8 +42,12 @@ export default function Modal({ isOpen, onClose, title, children, className }: M
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              {title && (
-                <div className="flex items-center justify-between px-5 py-3 border-b border-[#e0e0e0] shrink-0">
+              {headerContent ? (
+                <div className="shrink-0">
+                  {headerContent}
+                </div>
+              ) : title && (
+                <div className="flex items-center justify-between px-5 py-3 shrink-0">
                   <h2 className="text-[17px] font-semibold text-[#1d1d1f] tracking-[-0.374px]">{title}</h2>
                   <button
                     onClick={onClose}

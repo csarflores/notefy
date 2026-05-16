@@ -6,11 +6,12 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
+import NoteEditor from '@/components/notes/NoteEditor';
 import { updateTask } from '@/actions/task-actions';
-import { getProjectUsers } from '@/actions/project-actions';
+import { getBoardUsers } from '@/actions/board-actions';
 import { getProjectTags } from '@/actions/tag-actions';
 import { ITag, ITask, IUser } from '@/types';
-import { X, Plus, Check } from 'lucide-react';
+import { X, Plus, Check, Save } from 'lucide-react';
 import { generateRandomColor } from '@/lib/utils';
 
 interface EditTaskModalProps {
@@ -34,6 +35,7 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const hasLoadedRef = useRef<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Inicializar con datos de la tarea
   useEffect(() => {
@@ -57,11 +59,11 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
   }, [task, isOpen]);
 
   const loadProjectData = async () => {
-    if (!task?.projectId) return;
+    if (!task?.boardId) return;
 
     const [usersResult, tagsResult] = await Promise.all([
-      getProjectUsers(task.projectId.toString()),
-      getProjectTags(task.projectId.toString()),
+      getBoardUsers(task.boardId.toString()),
+      getProjectTags(task.boardId.toString()),
     ]);
 
     if (usersResult.success && usersResult.data) {
@@ -160,40 +162,44 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Editar Tarea">
-      <form onSubmit={handleSubmit} className="space-y-2.5">
-        {/* Título */}
-        <div>
-          <label htmlFor="title" className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
-            Título
-          </label>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      headerContent={
+        <div className="flex items-center justify-between px-5 py-3">
           <input
-            id="title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-1.5 rounded-lg border border-[#e0e0e0] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none transition-all text-[13px] text-[#1d1d1f]"
+            className="text-[17px] font-semibold text-[#1d1d1f] tracking-[-0.374px] border-none outline-none bg-transparent w-full max-w-md"
             placeholder="Nombre de la tarea"
-            required
             disabled={isLoading}
           />
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="primary"
+              isLoading={isLoading}
+              size="sm"
+              className="text-[13px] py-1.5"
+              onClick={() => formRef.current?.requestSubmit()}
+            >
+              <Save size={15} className="mr-1.5" />
+              Guardar
+            </Button>
+            <button
+              onClick={handleClose}
+              disabled={isLoading}
+              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
+              title="Cerrar"
+            >
+              <X size={18} className="text-[#7a7a7a]" />
+            </button>
+          </div>
         </div>
-
-        {/* Descripción */}
-        <div>
-          <label htmlFor="description" className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
-            Descripción
-          </label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-1.5 rounded-lg border border-[#e0e0e0] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none transition-all resize-none text-[13px] text-[#1d1d1f] max-h-20 overflow-y-auto"
-            placeholder="Descripción de la tarea (opcional)"
-            rows={3}
-            disabled={isLoading}
-          />
-        </div>
+      }
+    >
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-2.5">
 
         {/* Estado */}
         <div>
@@ -341,35 +347,27 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
           </p>
         </div>
 
+        {/* Descripción */}
+        <div>
+          <label htmlFor="description" className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
+            Descripción <span className="font-light text-[12px] text-[#7a7a7a]">(opcional)</span>
+          </label>
+          <div className="w-full rounded-lg focus:ring-1 focus:ring-[#0066cc]/20 outline-none transition-all min-h-[80px]">
+            <NoteEditor
+              content={description}
+              onChange={setDescription}
+              editable={true}
+              placeholder="Descripción de la tarea..."
+            />
+          </div>
+        </div>
+
         {/* Error */}
         {error && (
           <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-[12px] text-red-600 tracking-[-0.12px]">{error}</p>
           </div>
         )}
-
-        {/* Botones */}
-        <div className="flex gap-2 pt-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onClose}
-            disabled={isLoading}
-            size="sm"
-            className="flex-1"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            isLoading={isLoading}
-            size="sm"
-            className="flex-1"
-          >
-            Guardar
-          </Button>
-        </div>
       </form>
     </Modal>
   );

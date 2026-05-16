@@ -1,21 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, LogOut, User, Folder } from 'lucide-react';
+import { Plus, LogOut, User, Folder, FileText } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import Button from '@/components/ui/Button';
 import CreateProjectModal from '@/components/dashboard/CreateProjectModal';
 import CreateBoardModal from '@/components/dashboard/CreateBoardModal';
 import CreateProjectGroupModal from '@/components/dashboard/CreateProjectGroupModal';
+import CreateNoteModal from '@/components/notes/CreateNoteModal';
 
 interface DashboardClientProps {
   userId: string;
   userName: string;
+  userEmail?: string;
 }
 
-export default function DashboardClient({ userId, userName }: DashboardClientProps) {
+export default function DashboardClient({ userId, userName, userEmail }: DashboardClientProps) {
   const [isBoardModalOpen, setIsBoardModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/auth/login' });
@@ -41,6 +44,14 @@ export default function DashboardClient({ userId, userName }: DashboardClientPro
           >
             <Plus size={15} className="mr-1.5" />
             Nuevo Tablero
+          </Button>
+          <Button
+            onClick={() => setIsNoteModalOpen(true)}
+            size="sm"
+            variant="secondary"
+          >
+            <FileText size={15} className="mr-1.5" />
+            Nueva Nota
           </Button>
         </div>
 
@@ -83,6 +94,15 @@ export default function DashboardClient({ userId, userName }: DashboardClientPro
             <Plus size={15} className="mr-1.5" />
             Nuevo Tablero
           </Button>
+          <Button
+            onClick={() => setIsNoteModalOpen(true)}
+            size="sm"
+            variant="secondary"
+            className="w-full"
+          >
+            <FileText size={15} className="mr-1.5" />
+            Nueva Nota
+          </Button>
         </div>
       </div>
 
@@ -96,6 +116,14 @@ export default function DashboardClient({ userId, userName }: DashboardClientPro
         isOpen={isProjectModalOpen}
         onClose={() => setIsProjectModalOpen(false)}
         userId={userId}
+      />
+
+      <CreateNoteModal
+        isOpen={isNoteModalOpen}
+        onClose={() => setIsNoteModalOpen(false)}
+        userId={userId}
+        ownerEmail={userEmail}
+        ownerName={userName}
       />
     </>
   );

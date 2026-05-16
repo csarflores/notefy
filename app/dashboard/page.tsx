@@ -5,28 +5,51 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { getUserProjects } from '@/actions/project-actions';
 import { getUserBoards } from '@/actions/board-actions';
+import { getUserNotes } from '@/actions/note-actions';
+import { getUserById } from '@/actions/user-actions';
 import DashboardClient from './DashboardClient';
 import DashboardWithDragDrop from './DashboardWithDragDrop';
 import { Logo } from '@/components/ui/Logotipo';
 
-async function ProjectsAndBoardsList({ userId }: { userId: string }) {
-  const [projectsResult, boardsResult] = await Promise.all([
+async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; userEmail?: string }) {
+  const [projectsResult, boardsResult, notesResult] = await Promise.all([
     getUserProjects(userId),
-    getUserBoards(userId)
+    getUserBoards(userId),
+    getUserNotes(userId)
   ]);
 
-  if (!projectsResult.success || !boardsResult.success) {
+  if (!projectsResult.success || !boardsResult.success || !notesResult.success) {
     return (
       <div className="text-center py-12">
-        <p className="text-[#7a7a7a]">Error al cargar los proyectos y tableros</p>
+        <p className="text-[#7a7a7a]">Error al cargar los proyectos, tableros y notas</p>
       </div>
     );
   }
 
   const allProjects = projectsResult.data || [];
   const allBoards = boardsResult.data || [];
+  const allNotes = notesResult.data || [];
 
-  if (allProjects.length === 0 && allBoards.length === 0) {
+  // Obtener información del owner de cada nota
+  const notesWithOwnerInfo = await Promise.all(
+    allNotes.map(async (note) => {
+      const ownerResult = await getUserById(note.owner.toString());
+      if (ownerResult.success && ownerResult.data) {
+        return {
+          note,
+          ownerEmail: ownerResult.data.email || '',
+          ownerName: ownerResult.data.name || ''
+        };
+      }
+      return {
+        note,
+        ownerEmail: '',
+        ownerName: ''
+      };
+    })
+  );
+
+  if (allProjects.length === 0 && allBoards.length === 0 && allNotes.length === 0) {
     return (
       <div className="text-center py-12 sm:py-16">
         <div className="max-w-md mx-auto px-4">
@@ -35,10 +58,10 @@ async function ProjectsAndBoardsList({ userId }: { userId: string }) {
             <Plus size={32} className="hidden sm:block text-[#7a7a7a]" />
           </div>
           <h3 className="text-[17px] sm:text-[21px] font-semibold text-[#1d1d1f] mb-2 tracking-[-0.374px]">
-            No tienes proyectos ni tableros aún
+            No tienes proyectos, tableros ni notas aún
           </h3>
           <p className="text-[14px] sm:text-[17px] text-[#7a7a7a] tracking-[-0.224px]">
-            Crea tu primer proyecto o tablero para comenzar a organizar tus tareas
+            Crea tu primer proyecto, tablero o nota para comenzar a organizar tu trabajo
           </p>
         </div>
       </div>
@@ -59,9 +82,11 @@ async function ProjectsAndBoardsList({ userId }: { userId: string }) {
     .map((board) => ({ item: board }));
 
   return (
-    <DashboardWithDragDrop 
+    <DashboardWithDragDrop
       projects={projectsWithBoardCount}
       unassignedBoards={unassignedBoards}
+      notes={notesWithOwnerInfo}
+      userId={userId}
     />
   );
 }
@@ -122,12 +147,12 @@ export default async function DashboardPage() {
         </div>
 
         {/* Botón de crear proyecto */}
-        <DashboardClient userId={session.user.id} userName={session.user.name} />
+        <DashboardClient userId={session.user.id} userName={session.user.name} userEmail={session.user.email} />
 
         {/* Lista de proyectos y tableros */}
         <div className="mt-4 sm:mt-5">
           <Suspense fallback={<ProjectsLoading />}>
-            <ProjectsAndBoardsList userId={session.user.id} />
+            <ProjectsAndBoardsList userId={session.user.id} userEmail={session.user.email} />
           </Suspense>
         </div>
       </div>

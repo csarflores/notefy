@@ -4,13 +4,16 @@ import { redirect, notFound } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { getProjectById, getProjectUsers } from '@/actions/project-actions';
 import { getProjectBoards } from '@/actions/board-actions';
+import { getProjectNotes } from '@/actions/note-actions';
+import { getUserById } from '@/actions/user-actions';
 import BoardCard from '@/components/dashboard/BoardCard';
-import { ArrowLeft, FolderOpen, Plus, Users } from 'lucide-react';
-import Link from 'next/link';
 import ParentProjectClient from './ParentProjectClient';
+import { ArrowLeft, FolderOpen, Users } from 'lucide-react';
+import Link from 'next/link';
+import ProjectNotesClient from './ProjectNotesClient';
 
-async function BoardsList({ parentId, userId }: { parentId: string; userId: string }) {
-  const result = await getProjectBoards(parentId, userId);
+async function BoardsList({ projectId, userId }: { projectId: string; userId: string }) {
+  const result = await getProjectBoards(projectId, userId);
 
   if (!result.success || !result.data) {
     return (
@@ -48,6 +51,49 @@ async function BoardsList({ parentId, userId }: { parentId: string; userId: stri
       ))}
     </div>
   );
+}
+
+async function NotesList({ projectId, userId, userEmail }: { projectId: string; userId: string; userEmail?: string }) {
+  const result = await getProjectNotes(projectId, userId);
+
+  if (!result.success || !result.data) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-[#7a7a7a]">Error al cargar las notas</p>
+      </div>
+    );
+  }
+
+  const notes = result.data;
+
+  if (notes.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-[#7a7a7a]">No hay notas en este proyecto</p>
+      </div>
+    );
+  }
+
+  // Obtener información del owner de cada nota
+  const notesWithOwnerInfo = await Promise.all(
+    notes.map(async (note) => {
+      const ownerResult = await getUserById(note.owner.toString());
+      if (ownerResult.success && ownerResult.data) {
+        return {
+          note,
+          ownerEmail: ownerResult.data.email || '',
+          ownerName: ownerResult.data.name || ''
+        };
+      }
+      return {
+        note,
+        ownerEmail: '',
+        ownerName: ''
+      };
+    })
+  );
+
+  return <ProjectNotesClient notes={notesWithOwnerInfo} userId={userId} />;
 }
 
 function BoardsLoading() {
@@ -141,22 +187,40 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             ))}
           </span>
           {isOwner && (
-            <ParentProjectClient 
-              userId={session.user.id} 
-              parentId={id} 
+            <ParentProjectClient
+              userId={session.user.id}
+              parentId={id}
               project={project}
               mode="share"
+              ownerEmail={session.user.email}
+              ownerName={session.user.name}
             />
           )}
         </div>
 
         {/* Botón de crear tablero */}
-        <ParentProjectClient userId={session.user.id} parentId={id} />
+        <ParentProjectClient userId={session.user.id} parentId={id} ownerEmail={session.user.email} ownerName={session.user.name} />
 
         {/* Lista de tableros */}
         <div className="mt-4 sm:mt-5">
           <Suspense fallback={<BoardsLoading />}>
-            <BoardsList parentId={id} userId={session.user.id} />
+            <BoardsList projectId={id} userId={session.user.id} />
+          </Suspense>
+        </div>
+
+        {/* Separador */}
+        <div className="my-8 border-t border-gray-200" />
+
+        {/* Sección de notas */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[15px] font-semibold text-[#1d1d1f] tracking-[-0.24px]">
+              Notas del Proyecto
+            </h2>
+            <ParentProjectClient userId={session.user.id} parentId={id} mode="note" ownerEmail={session.user.email} ownerName={session.user.name} />
+          </div>
+          <Suspense fallback={<BoardsLoading />}>
+            <NotesList projectId={id} userId={session.user.id} userEmail={session.user.email} />
           </Suspense>
         </div>
       </div>

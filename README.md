@@ -11,6 +11,11 @@ El objetivo principal es proporcionar una herramienta de gestión de tareas **gr
 ## 🚀 Funcionalidades Principales
 - **Tableros Kanban:** Flujo de trabajo visual con columnas de "Pendiente", "En Proceso" y "Finalizado".
 - **Sistema Multiproyecto:** Un dashboard centralizado para navegar entre diferentes iniciativas o clientes.
+- **Notas:** Editor de texto rico tipo Word para documentación y notas de proyecto.
+- **Tipos de Notas:**
+  - **Privadas:** Solo visible para el propietario (incluso dentro de proyectos).
+  - **Compartidas:** Visible para propietario y miembros con permiso de edición.
+  - **En Proyecto:** Asociadas a proyectos para mejor organización.
 - **Tarjetas Enriquecidas:** Tareas con descripciones detalladas, soporte para imágenes (Cloudinary), asignación de responsables y sistema de etiquetas (Tags) por colores.
 - **Arrastrar y Soltar:** Interfaz interactiva y rápida mediante `@hello-pangea/dnd`.
 - **Diseño Premium:** Interfaz minimalista con bordes redondeados, sombras suaves y efectos de desenfoque (Glassmorphism).
@@ -20,6 +25,7 @@ El objetivo principal es proporcionar una herramienta de gestión de tareas **gr
 - **Estilos:** Tailwind CSS + [GetDesign Apple](https://getdesign.md/apple/design-md).
 - **Base de Datos:** MongoDB & Mongoose.
 - **Autenticación:** NextAuth.js (Gestionada por correos de equipo).
+- **Editor de Texto:** Tiptap (editor de texto rico moderno).
 - **Almacenamiento de Imágenes:** Cloudinary.
 
 ## 📁 Documentación del Contexto (Claude/AI)

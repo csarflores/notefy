@@ -9,9 +9,17 @@ notefy/
 │   ├── page.tsx                 # Página principal (landing/auth)
 │   ├── globals.css              # Estilos globales + Tailwind
 │   ├── dashboard/               # Dashboard multiproyecto
-│   │   ├── page.tsx            # Lista de proyectos
+│   │   ├── page.tsx            # Lista de proyectos, tableros y notas
 │   │   └── layout.tsx          # Layout del dashboard
-│   ├── project/                 # Vistas de proyecto
+│   ├── notes/                   # Vistas de notas
+│   │   └── [id]/               # Nota específica (dinámico)
+│   │       ├── page.tsx        # Vista y edición de nota
+│   │       └── NoteEditorClient.tsx  # Componente cliente de edición
+│   ├── parent-project/          # Vistas de proyectos
+│   │   └── [id]/               # Proyecto específico (dinámico)
+│   │       ├── page.tsx        # Tableros y notas del proyecto
+│   │       └── ParentProjectClient.tsx  # Componente cliente
+│   ├── project/                 # Vistas de proyecto (legacy)
 │   │   └── [id]/               # Proyecto específico (dinámico)
 │   │       ├── page.tsx        # Tablero Kanban
 │   │       └── settings/       # Configuración del proyecto
@@ -29,8 +37,12 @@ notefy/
 │   │   ├── Board.tsx           # Tablero completo
 │   │   ├── Column.tsx          # Columna (todo/in-progress/done)
 │   │   └── TaskCard.tsx        # Tarjeta de tarea
-│   └── dashboard/               # Componentes del dashboard
-│       └── ProjectCard.tsx     # Tarjeta de proyecto
+│   ├── dashboard/               # Componentes del dashboard
+│   │   └── ProjectCard.tsx     # Tarjeta de proyecto
+│   └── notes/                   # Componentes de notas
+│       ├── NoteEditor.tsx      # Editor de texto rico (Tiptap)
+│       ├── NoteCard.tsx        # Tarjeta de nota
+│       └── CreateNoteModal.tsx # Modal para crear notas
 ├── lib/                         # Utilidades y configuraciones
 │   ├── mongodb.ts              # Singleton de conexión MongoDB
 │   ├── cloudinary.ts           # Configuración de Cloudinary
@@ -38,10 +50,15 @@ notefy/
 ├── models/                      # Esquemas de Mongoose
 │   ├── User.ts                 # Modelo de usuario
 │   ├── Project.ts              # Modelo de proyecto
-│   └── Task.ts                 # Modelo de tarea
+│   ├── Board.ts                # Modelo de tablero
+│   ├── Task.ts                 # Modelo de tarea
+│   └── Note.ts                 # Modelo de nota
 ├── actions/                     # Server Actions de Next.js 15
+│   ├── auth-actions.ts         # Acciones de autenticación
 │   ├── project-actions.ts      # Acciones de proyectos
-│   └── task-actions.ts         # Acciones de tareas
+│   ├── board-actions.ts        # Acciones de tableros
+│   ├── tag-actions.ts          # Acciones de etiquetas
+│   └── note-actions.ts         # Acciones de notas
 ├── types/                       # Tipos TypeScript compartidos
 │   └── index.ts                # Definiciones de tipos
 ├── public/                      # Archivos estáticos
@@ -55,10 +72,27 @@ notefy/
 ## Flujo de Datos
 
 1. **Autenticación:** NextAuth.js maneja login/logout
-2. **Dashboard:** Lista proyectos del usuario desde MongoDB
-3. **Kanban:** Carga tareas por proyecto con Server Actions
-4. **Drag & Drop:** Actualización optimista + Server Action para persistir
-5. **Imágenes:** Upload a Cloudinary, URL guardada en MongoDB
+2. **Dashboard:** Lista proyectos, tableros y notas del usuario desde MongoDB
+3. **Kanban:** Carga tareas por tablero con Server Actions
+4. **Notas:** Carga notas del usuario y de proyectos con Server Actions
+5. **Editor de Notas:** Editor de texto rico (Tiptap) con actualización en tiempo real
+6. **Drag & Drop:** Actualización optimista + Server Action para persistir
+7. **Imágenes:** Upload a Cloudinary, URL guardada en MongoDB (pendiente para notas)
+
+## Modelos de Datos
+
+### Note (Nota)
+- **title:** Título de la nota
+- **content:** Contenido en HTML (del editor Tiptap)
+- **visibility:** 'private' | 'shared'
+- **owner:** Usuario propietario
+- **members:** Array de emails (para notas compartidas)
+- **projectId:** Referencia opcional a Project (null si no está en proyecto)
+
+**Tipos de Notas:**
+- **Privadas:** Solo visible para el owner (incluso si está en un proyecto)
+- **Compartidas:** Visible para owner + members (pueden editar)
+- **En Proyecto:** Asociada a un proyecto, pero puede ser privada o compartida
 
 ## Convenciones
 

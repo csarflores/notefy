@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
@@ -8,6 +8,7 @@ import { updateBoard } from '@/actions/board-actions';
 import { getUserProjects } from '@/actions/project-actions';
 import { IBoard } from '@/types';
 import { useSession } from 'next-auth/react';
+import { Save, X } from 'lucide-react';
 
 interface EditBoardModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [error, setError] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (board) {
@@ -93,23 +95,45 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Editar Tablero">
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-[#1d1d1f] mb-2">
-            Nombre del tablero
-          </label>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      headerContent={
+        <div className="flex items-center justify-between px-5 py-3">
           <input
-            id="name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ej: Marketing Q1 2026"
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/20 outline-none transition-all text-[#1d1d1f] placeholder:text-gray-400"
+            className="text-[17px] font-semibold text-[#1d1d1f] tracking-[-0.374px] border-none outline-none bg-transparent w-full max-w-md"
+            placeholder="Nombre del tablero"
+            required
             disabled={isLoading}
             autoFocus
           />
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="primary"
+              isLoading={isLoading}
+              size="sm"
+              className="text-[13px] py-1.5"
+              onClick={() => formRef.current?.requestSubmit()}
+            >
+              <Save size={16} className="mr-1" /> Guardar
+            </Button>
+            <button
+              onClick={handleClose}
+              disabled={isLoading}
+              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
+              title="Cerrar"
+            >
+              <X size={18} className="text-[#7a7a7a]" />
+            </button>
+          </div>
         </div>
+      }
+    >
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-[#1d1d1f] mb-2">
@@ -154,21 +178,6 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
             {error}
           </div>
         )}
-
-        <div className="flex gap-3 pt-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleClose}
-            disabled={isLoading}
-            className="flex-1"
-          >
-            Cancelar
-          </Button>
-          <Button type="submit" isLoading={isLoading} className="flex-1">
-            Guardar Cambios
-          </Button>
-        </div>
       </form>
     </Modal>
   );
