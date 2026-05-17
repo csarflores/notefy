@@ -10,6 +10,7 @@ import { getUserById } from '@/actions/user-actions';
 import DashboardClient from './DashboardClient';
 import DashboardWithDragDrop from './DashboardWithDragDrop';
 import { Logo } from '@/components/ui/Logotipo';
+import Footer from '@/components/dashboard/Footer';
 
 async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; userEmail?: string }) {
   const [projectsResult, boardsResult, notesResult] = await Promise.all([
@@ -127,8 +128,8 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
+    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full flex flex-col">
+      <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
         {/* Header */}
         <div className="mb-12">
           <div className="flex items-center justify-between gap-4">
@@ -159,6 +160,8 @@ export default async function DashboardPage() {
           </Suspense>
         </div>
       </div>
+      
+      <Footer />
     </div>
   );
 }
