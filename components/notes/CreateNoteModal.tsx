@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NoteEditor from './NoteEditor';
-import { Lock, Users, Save, X } from 'lucide-react';
+import { Lock, Users, Save, X, Palette } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { createNote, shareNote } from '@/actions/note-actions';
 import { CreateNoteInput } from '@/types';
 import { useNotification } from '@/components/ui/NotificationContext';
+import { PROJECT_COLORS } from '@/constants/project-colors';
 
 interface CreateNoteModalProps {
   isOpen: boolean;
@@ -30,11 +31,13 @@ export default function CreateNoteModal({
   const { showNotification } = useNotification();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [color, setColor] = useState('#f59e0b');
   const [visibility, setVisibility] = useState<'private' | 'shared'>('private');
   const [memberEmail, setMemberEmail] = useState('');
   const [members, setMembers] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -48,6 +51,7 @@ export default function CreateNoteModal({
         title,
         content,
         visibility,
+        color,
         projectId: projectId || null,
       };
 
@@ -63,9 +67,11 @@ export default function CreateNoteModal({
 
         setTitle('');
         setContent('');
+        setColor('#f59e0b');
         setVisibility('private');
         setMemberEmail('');
         setMembers([]);
+        setShowColorPicker(false);
         onClose();
         router.refresh();
       } else {
@@ -133,6 +139,49 @@ export default function CreateNoteModal({
                   {/* Información del propietario */}
                   <div className="mb-3 text-[11px] sm:text-[12px] text-[#7a7a7a]">
                     Propietario: {ownerName || ownerEmail || 'Usuario'}
+                  </div>
+
+                  {/* Selector de Color */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowColorPicker(!showColorPicker)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                      >
+                        <div 
+                          className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-xs text-gray-600 font-medium">
+                          {PROJECT_COLORS.find(c => c.value === color)?.name || 'Personalizado'}
+                        </span>
+                        <Palette size={14} className="text-gray-500" />
+                      </button>
+                    </div>
+
+                    {/* Paleta de colores */}
+                    {showColorPicker && (
+                      <div className="grid grid-cols-6 gap-1.5 p-2 bg-gray-50 rounded-lg">
+                        {PROJECT_COLORS.map((colorOption) => (
+                          <button
+                            key={colorOption.value}
+                            type="button"
+                            onClick={() => {
+                              setColor(colorOption.value);
+                              setShowColorPicker(false);
+                            }}
+                            className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
+                              color === colorOption.value 
+                                ? 'border-gray-800 shadow-lg scale-110' 
+                                : 'border-white shadow-sm hover:border-gray-400'
+                            }`}
+                            style={{ backgroundColor: colorOption.value }}
+                            title={colorOption.name}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Controles de visibilidad */}

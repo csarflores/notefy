@@ -29,6 +29,16 @@ const ProjectSchema = new Schema<IProject>(
         message: 'Todos los miembros deben tener emails válidos',
       },
     },
+    color: {
+      type: String,
+      default: '#0066cc',
+      validate: {
+        validator: function (color: string) {
+          return /^#[0-9A-Fa-f]{6}$/.test(color);
+        },
+        message: 'El color debe ser un código hexadecimal válido (ej: #0066cc)',
+      },
+    },
   },
   {
     timestamps: true,

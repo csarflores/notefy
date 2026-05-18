@@ -18,6 +18,7 @@ export interface IProject extends Document {
   description?: string;
   owner: Types.ObjectId;
   members: string[];
+  color: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,6 +32,8 @@ export interface IBoard extends Document {
   members: string[];
   tags: ITag[];
   projectId?: Types.ObjectId | null;
+  color: string;
+  order: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -67,6 +70,7 @@ export interface INote extends Document {
   owner: Types.ObjectId;
   members: string[];
   projectId?: Types.ObjectId | null;
+  color: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,6 +86,7 @@ export type ApiResponse<T> = {
 export type CreateProjectInput = {
   name: string;
   description?: string;
+  color?: string;
 };
 
 export type UpdateProjectInput = Partial<CreateProjectInput> & {
@@ -93,6 +98,7 @@ export type CreateBoardInput = {
   name: string;
   description?: string;
   projectId?: string | null;
+  color?: string;
 };
 
 export type UpdateBoardInput = Partial<CreateBoardInput> & {
@@ -124,6 +130,7 @@ export type CreateNoteInput = {
   content: string;
   visibility?: 'private' | 'shared';
   projectId?: string | null;
+  color?: string;
 };
 
 export type UpdateNoteInput = Partial<CreateNoteInput> & {

@@ -8,7 +8,8 @@ import { updateBoard } from '@/actions/board-actions';
 import { getUserProjects } from '@/actions/project-actions';
 import { IBoard } from '@/types';
 import { useSession } from 'next-auth/react';
-import { Save, X } from 'lucide-react';
+import { Save, X, Palette } from 'lucide-react';
+import { PROJECT_COLORS } from '@/constants/project-colors';
 
 interface EditBoardModalProps {
   isOpen: boolean;
@@ -21,17 +22,20 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
   const { data: session } = useSession();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [color, setColor] = useState('#6b7280');
   const [projectId, setProjectId] = useState<string | null>(null);
   const [availableProjects, setAvailableProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [error, setError] = useState('');
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (board) {
       setName(board.name);
       setDescription(board.description || '');
+      setColor(board.color || '#6b7280');
       setProjectId(board.projectId?.toString() || null);
     }
   }, [board]);
@@ -71,6 +75,7 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
       const result = await updateBoard(board._id.toString(), {
         name: name.trim(),
         description: description.trim(),
+        color: color,
         projectId: projectId,
       });
 
@@ -134,6 +139,56 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
       }
     >
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+
+        {/* Selector de Color */}
+        <div>
+          <label className="block text-sm font-medium text-[#1d1d1f] mb-2">
+            Color del Tablero
+          </label>
+          <div className="space-y-3">
+            {/* Color seleccionado actual */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowColorPicker(!showColorPicker)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                disabled={isLoading}
+              >
+                <div 
+                  className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-sm text-[#1d1d1f] font-medium">
+                  {PROJECT_COLORS.find(c => c.value === color)?.name || 'Personalizado'}
+                </span>
+                <Palette size={16} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Paleta de colores */}
+            {showColorPicker && (
+              <div className="grid grid-cols-6 gap-2 p-3 bg-gray-50 rounded-lg">
+                {PROJECT_COLORS.map((colorOption) => (
+                  <button
+                    key={colorOption.value}
+                    type="button"
+                    onClick={() => {
+                      setColor(colorOption.value);
+                      setShowColorPicker(false);
+                    }}
+                    className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 ${
+                      color === colorOption.value 
+                        ? 'border-gray-800 shadow-lg scale-110' 
+                        : 'border-white shadow-sm hover:border-gray-400'
+                    }`}
+                    style={{ backgroundColor: colorOption.value }}
+                    title={colorOption.name}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-[#1d1d1f] mb-2">

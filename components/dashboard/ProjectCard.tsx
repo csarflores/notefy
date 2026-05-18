@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { deleteProject } from '@/actions/project-actions';
 import { IProject } from '@/types';
 import { formatDate } from '@/lib/utils';
+import { getProjectGradient } from '@/constants/project-colors';
 
 interface ProjectCardProps {
   project: IProject;
@@ -46,7 +47,6 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
     setIsOver(true);
   };
 
@@ -57,13 +57,13 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsOver(false);
-    
     const boardId = e.dataTransfer.getData('boardId');
     if (boardId && onBoardDrop) {
       onBoardDrop(boardId, project._id.toString());
     }
   };
 
+  
   return (
     <>
     {/* Tarjeta de Proyecto - Diseño distintivo con gradiente y más prominente */}
@@ -71,7 +71,7 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`bg-linear-to-br from-[#0066cc] to-[#0052a3] rounded-lg p-3 shadow-md hover:shadow-lg transition-all duration-200 relative group ${
+      className={`bg-gradient-to-br ${getProjectGradient(project.color)} rounded-lg p-3 shadow-md hover:shadow-lg transition-all duration-200 relative group ${
         isOver ? 'ring-4 ring-white ring-opacity-50 scale-105' : ''
       }`}
     >

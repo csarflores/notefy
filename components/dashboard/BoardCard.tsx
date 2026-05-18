@@ -9,12 +9,26 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { deleteBoard } from '@/actions/board-actions';
 import { IBoard } from '@/types';
 import { formatDate } from '@/lib/utils';
+import { getProjectGradient } from '@/constants/project-colors';
 
 interface BoardCardProps {
   board: IBoard;
+  index?: number;
+  onDragStart?: (boardId: string, index: number, projectId?: string | null) => void;
+  onDragEnd?: () => void;
+  onDrop?: (boardId: string, index: number) => void;
+  isDragOver?: boolean;
 }
 
-export default function BoardCard({ board }: BoardCardProps) {
+export default function BoardCard({ 
+  board, 
+  index = 0, 
+  onDragStart, 
+  onDragEnd, 
+  onDrop, 
+  isDragOver = false 
+}: BoardCardProps) {
+  
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -22,18 +36,42 @@ export default function BoardCard({ board }: BoardCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    // No hacer click si estamos arrastrando
+    if (isDragging) return;
     router.push(`/board/${board._id}`);
   };
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('boardId', board._id.toString());
+    e.dataTransfer.setData('boardIndex', index.toString());
+    e.dataTransfer.setData('projectId', board.projectId?.toString() || '');
     setIsDragging(true);
+    onDragStart?.(board._id.toString(), index, board.projectId?.toString() || null);
   };
 
   const handleDragEnd = () => {
     setIsDragging(false);
+    onDragEnd?.();
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    
+    const draggedBoardId = e.dataTransfer.getData('boardId');
+    const draggedBoardIndex = parseInt(e.dataTransfer.getData('boardIndex'));
+    const draggedProjectId = e.dataTransfer.getData('projectId') || null;
+    
+    // Solo permitir reordenamiento si es del mismo proyecto (o ambos sin proyecto)
+    if ((board.projectId?.toString() || undefined) === (draggedProjectId || undefined) && draggedBoardId !== board._id.toString()) {
+      onDrop?.(draggedBoardId, index);
+    }
   };
 
   const handleDelete = async () => {
@@ -64,9 +102,14 @@ export default function BoardCard({ board }: BoardCardProps) {
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       className={`bg-white rounded-lg p-2.5 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group cursor-move ${
         isDragging ? 'opacity-50 scale-95' : ''
+      } ${
+        isDragOver ? 'ring-2 ring-blue-400 scale-105' : ''
       }`}
+      style={{ borderColor: board.color ? board.color : undefined }}
     >
       <div className="flex items-start justify-between mb-1.5">
         <div className="flex-1 min-w-0">

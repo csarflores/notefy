@@ -4,6 +4,7 @@ import { INote } from '@/types';
 import { FileText, Lock, Users, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
+import { getProjectGradient } from '@/constants/project-colors';
 
 interface NoteCardProps {
   note: INote;
@@ -33,10 +34,10 @@ export default function NoteCard({ note, onOpenNote, isOwner = true }: NoteCardP
     <div
       onClick={onOpenNote}
       className={cn(
-        'bg-white border border-gray-200 rounded-lg p-3 cursor-pointer',
-        'hover:border-blue-300 hover:shadow-lg transition-all duration-200',
+        'bg-white border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 rounded-lg p-3 cursor-pointer',
         'group'
       )}
+      style={{ borderColor: note.color ? note.color : undefined }}
     >
       <div className="flex items-start justify-between mb-2">
         <h3 className="text-[13px] font-semibold text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors">

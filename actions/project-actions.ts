@@ -83,6 +83,7 @@ export async function createProject(
     const newProject = await Project.create({
       name: data.name.trim(),
       description: data.description?.trim() || '',
+      color: data.color || '#0066cc',
       owner: userId,
       members: [],
     });
@@ -111,6 +112,7 @@ export async function updateProject(
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.description !== undefined) updateData.description = data.description.trim();
+    if (data.color !== undefined) updateData.color = data.color;
     if (data.members !== undefined) updateData.members = data.members;
 
     const updatedProject = await Project.findByIdAndUpdate(

@@ -41,6 +41,16 @@ const NoteSchema = new Schema<INote>(
       ref: 'Project',
       default: null,
     },
+    color: {
+      type: String,
+      default: '#f59e0b',
+      validate: {
+        validator: function (color: string) {
+          return /^#[0-9A-Fa-f]{6}$/.test(color);
+        },
+        message: 'El color debe ser un código hexadecimal válido (ej: #f59e0b)',
+      },
+    },
   },
   {
     timestamps: true,

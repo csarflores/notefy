@@ -29,7 +29,7 @@ export async function getUserBoards(userId: string): Promise<ApiResponse<IBoard[
         { members: user.email }
       ]
     })
-      .sort({ updatedAt: -1 })
+      .sort({ order: 1, updatedAt: -1 })
       .lean();
 
     return { success: true, data: JSON.parse(JSON.stringify(boards)) };
@@ -66,7 +66,7 @@ export async function getProjectBoards(projectId: string, userId: string): Promi
         { members: user.email }
       ]
     })
-      .sort({ updatedAt: -1 })
+      .sort({ order: 1, updatedAt: -1 })
       .lean();
 
     return { success: true, data: JSON.parse(JSON.stringify(boards)) };
@@ -188,12 +188,22 @@ export async function createBoard(
       }
     }
 
+    // Obtener el orden más alto para tableros del mismo proyecto/usuario
+    const lastBoard = await Board.findOne({
+      owner: userId,
+      projectId: data.projectId || null
+    }).sort({ order: -1 });
+
+    const newOrder = lastBoard ? lastBoard.order + 1 : 0;
+
     const newBoard = await Board.create({
       name: data.name.trim(),
       description: data.description?.trim() || '',
       owner: userId,
       members: projectMembers,
       projectId: data.projectId || null,
+      color: data.color || '#6b7280',
+      order: newOrder,
     });
 
     revalidatePath('/dashboard');
@@ -235,6 +245,7 @@ export async function updateBoard(
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.description !== undefined) updateData.description = data.description.trim();
+    if (data.color !== undefined) updateData.color = data.color;
     if (data.members !== undefined) updateData.members = data.members;
     if (data.projectId !== undefined) updateData.projectId = data.projectId;
 
@@ -355,6 +366,49 @@ export async function removeBoardMember(
   } catch (error) {
     console.error('Error al eliminar miembro:', error);
     return { success: false, error: 'Error al eliminar el miembro' };
+  }
+}
+
+// Reordenar tableros
+export async function reorderBoards(
+  userId: string,
+  boardOrders: Array<{ boardId: string; order: number; projectId?: string | null }>
+): Promise<ApiResponse<IBoard[]>> {
+  try {
+    if (!isValidObjectId(userId)) {
+      return { success: false, error: 'ID de usuario inválido' };
+    }
+
+    await connectDB();
+
+    // Verificar que el usuario es owner de todos los tableros
+    const boardIds = boardOrders.map(bo => bo.boardId);
+    const boards = await Board.find({
+      _id: { $in: boardIds },
+      owner: userId
+    });
+
+    if (boards.length !== boardOrders.length) {
+      return { success: false, error: 'No tienes permiso para reordenar algunos tableros' };
+    }
+
+    // Actualizar el orden de cada tablero
+    const updatePromises = boardOrders.map(({ boardId, order, projectId }) =>
+      Board.findByIdAndUpdate(
+        boardId,
+        { order, ...(projectId !== undefined && { projectId }) },
+        { new: true, runValidators: true }
+      ).lean()
+    );
+
+    const updatedBoards = await Promise.all(updatePromises);
+
+    revalidatePath('/dashboard');
+
+    return { success: true, data: JSON.parse(JSON.stringify(updatedBoards)) };
+  } catch (error) {
+    console.error('Error al reordenar tableros:', error);
+    return { success: false, error: 'Error al reordenar los tableros' };
   }
 }
 

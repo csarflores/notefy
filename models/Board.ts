@@ -61,6 +61,20 @@ const BoardSchema = new Schema<IBoard>(
       ref: 'Project',
       default: null,
     },
+    color: {
+      type: String,
+      default: '#6b7280',
+      validate: {
+        validator: function (color: string) {
+          return /^#[0-9A-Fa-f]{6}$/.test(color);
+        },
+        message: 'El color debe ser un código hexadecimal válido (ej: #6b7280)',
+      },
+    },
+    order: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

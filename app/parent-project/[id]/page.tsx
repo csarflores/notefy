@@ -6,7 +6,7 @@ import { getProjectById, getProjectUsers } from '@/actions/project-actions';
 import { getProjectBoards } from '@/actions/board-actions';
 import { getProjectNotes } from '@/actions/note-actions';
 import { getUserById } from '@/actions/user-actions';
-import BoardCard from '@/components/dashboard/BoardCard';
+import BoardsListClient from './BoardsListClient';
 import ParentProjectClient from './ParentProjectClient';
 import { ArrowLeft, FolderOpen, Users } from 'lucide-react';
 import Link from 'next/link';
@@ -45,11 +45,11 @@ async function BoardsList({ projectId, userId }: { projectId: string; userId: st
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 lg:gap-4">
-      {boards.map((board) => (
-        <BoardCard key={board._id.toString()} board={board} />
-      ))}
-    </div>
+    <BoardsListClient 
+      projectId={projectId} 
+      userId={userId} 
+      boards={boards} 
+    />
   );
 }
 
@@ -140,6 +140,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const usersResult = await getProjectUsers(id);
   const users = usersResult.success && usersResult.data ? usersResult.data : [];
 
+  const boardsResult = await getProjectBoards(id, session.user.id);
+  const boards = boardsResult.success && boardsResult.data ? boardsResult.data : [];
+
   const isOwner = project.owner.toString() === session.user.id;
 
   return (
@@ -203,7 +206,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
         {/* Lista de tableros */}
         <div className="mt-4 sm:mt-5">
-          <Suspense fallback={<BoardsLoading />}>
+          <Suspense fallback={<div>Cargando tableros...</div>}>
             <BoardsList projectId={id} userId={session.user.id} />
           </Suspense>
         </div>

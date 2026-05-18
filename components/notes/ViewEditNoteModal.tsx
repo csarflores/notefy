@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import NoteEditor from './NoteEditor';
-import { Trash2, Lock, Users, Save, X } from 'lucide-react';
+import { Trash2, Lock, Users, Save, X, Palette } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { INote } from '@/types';
 import { updateNote, deleteNote, shareNote, removeNoteMember } from '@/actions/note-actions';
 import { useNotification } from '@/components/ui/NotificationContext';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import { PROJECT_COLORS } from '@/constants/project-colors';
 
 interface ViewEditNoteModalProps {
   isOpen: boolean;
@@ -24,17 +25,20 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
   const { showNotification } = useNotification();
   const [content, setContent] = useState(note.content);
   const [visibility, setVisibility] = useState<'private' | 'shared'>(note.visibility as 'private' | 'shared');
+  const [color, setColor] = useState(note.color || '#f59e0b');
   const [memberEmail, setMemberEmail] = useState('');
   const [members, setMembers] = useState<string[]>(note.members || []);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   // Actualizar el contenido cuando la nota cambia
   useEffect(() => {
     setContent(note.content);
     setVisibility(note.visibility as 'private' | 'shared');
+    setColor(note.color || '#f59e0b');
     setMembers(note.members || []);
   }, [note]);
 
@@ -44,6 +48,7 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
       const result = await updateNote(note._id.toString(), userId, {
         content,
         visibility,
+        color,
         members,
       });
       if (result.success) {
@@ -154,6 +159,49 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
                   {/* Información del propietario */}
                   <div className="mb-3 text-[11px] sm:text-[12px] text-[#7a7a7a]">
                     Propietario: {ownerName || ownerEmail || 'Usuario'}
+                  </div>
+
+                  {/* Selector de Color */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowColorPicker(!showColorPicker)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                      >
+                        <div 
+                          className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-xs text-gray-600 font-medium">
+                          {PROJECT_COLORS.find(c => c.value === color)?.name || 'Personalizado'}
+                        </span>
+                        <Palette size={14} className="text-gray-500" />
+                      </button>
+                    </div>
+
+                    {/* Paleta de colores */}
+                    {showColorPicker && (
+                      <div className="grid grid-cols-6 gap-1.5 p-2 bg-gray-50 rounded-lg">
+                        {PROJECT_COLORS.map((colorOption) => (
+                          <button
+                            key={colorOption.value}
+                            type="button"
+                            onClick={() => {
+                              setColor(colorOption.value);
+                              setShowColorPicker(false);
+                            }}
+                            className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
+                              color === colorOption.value 
+                                ? 'border-gray-800 shadow-lg scale-110' 
+                                : 'border-white shadow-sm hover:border-gray-400'
+                            }`}
+                            style={{ backgroundColor: colorOption.value }}
+                            title={colorOption.name}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Controles de visibilidad */}

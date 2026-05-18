@@ -175,6 +175,7 @@ export async function createNote(
       owner: userId,
       members: [],
       projectId: data.projectId || null,
+      color: data.color || '#f59e0b',
     });
 
     revalidatePath('/dashboard');
@@ -227,6 +228,7 @@ export async function updateNote(
     if (data.title !== undefined) updateData.title = data.title.trim();
     if (data.content !== undefined) updateData.content = data.content;
     if (data.visibility !== undefined) updateData.visibility = data.visibility;
+    if (data.color !== undefined) updateData.color = data.color;
     if (data.members !== undefined) updateData.members = data.members;
     if (data.projectId !== undefined) {
       if (data.projectId && !isValidObjectId(data.projectId)) {

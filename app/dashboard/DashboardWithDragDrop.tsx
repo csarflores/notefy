@@ -6,7 +6,7 @@ import BoardCard from '@/components/dashboard/BoardCard';
 import NoteCard from '@/components/notes/NoteCard';
 import ViewEditNoteModal from '@/components/notes/ViewEditNoteModal';
 import { IProject, IBoard, INote } from '@/types';
-import { updateBoard } from '@/actions/board-actions';
+import { updateBoard, reorderBoards } from '@/actions/board-actions';
 import { useState } from 'react';
 import { useNotification } from '@/components/ui/NotificationContext';
 
@@ -30,6 +30,7 @@ export default function DashboardWithDragDrop({
   const [selectedOwnerEmail, setSelectedOwnerEmail] = useState<string>('');
   const [selectedOwnerName, setSelectedOwnerName] = useState<string>('');
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [draggedBoard, setDraggedBoard] = useState<{ id: string; index: number; projectId?: string | null } | null>(null);
 
   const handleBoardDrop = async (boardId: string, projectId: string) => {
     if (isUpdating) return;
@@ -48,6 +49,69 @@ export default function DashboardWithDragDrop({
     } catch (error) {
       console.error('Error al mover tablero:', error);
       showNotification('Error al mover el tablero', 'error');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleBoardDragStart = (boardId: string, index: number, projectId?: string | null) => {
+    setDraggedBoard({ id: boardId, index, projectId });
+  };
+
+  const handleBoardDragEnd = () => {
+    setDraggedBoard(null);
+  };
+
+  const handleBoardDropWrapper = (draggedBoardId: string, targetIndex: number) => {
+    handleBoardReorder(draggedBoardId, targetIndex, null);
+  };
+
+  const handleBoardReorder = async (draggedBoardId: string, targetIndex: number, projectId?: string | null) => {
+    
+    if (isUpdating) {
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      // Obtener los tableros actuales
+      const currentBoards = projectId 
+        ? unassignedBoards.filter(b => b.item.projectId?.toString() === projectId)
+        : unassignedBoards;
+
+      // Encontrar el tablero arrastrado
+      const draggedBoard = currentBoards.find(b => b.item._id.toString() === draggedBoardId);
+      if (!draggedBoard) {
+        console.error('Dragged board not found');
+        return;
+      }
+
+      // Crear nuevo orden
+      const newOrder = [...currentBoards];
+      const draggedIndex = newOrder.findIndex(b => b.item._id.toString() === draggedBoardId);
+      
+      // Mover el tablero a la nueva posición
+      newOrder.splice(draggedIndex, 1);
+      newOrder.splice(targetIndex, 0, draggedBoard);
+
+      // Preparar actualización de orden
+      const boardOrders = newOrder.map((board, index) => ({
+        boardId: board.item._id.toString(),
+        order: index,
+        projectId
+      }));
+
+      const result = await reorderBoards(userId, boardOrders);
+      
+      if (result.success) {
+        router.refresh();
+      } else {
+        console.error('Reorder failed:', result.error);
+        showNotification(result.error || 'Error al reordenar los tableros', 'error');
+      }
+    } catch (error) {
+      console.error('Error al reordenar tableros:', error);
+      showNotification('Error al reordenar los tableros', 'error');
     } finally {
       setIsUpdating(false);
     }
@@ -93,8 +157,16 @@ export default function DashboardWithDragDrop({
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
-            {unassignedBoards.map(({ item }) => (
-              <BoardCard key={item._id.toString()} board={item} />
+            {unassignedBoards.map(({ item }, index) => (
+              <BoardCard 
+                key={item._id.toString()} 
+                board={item} 
+                index={index}
+                onDragStart={handleBoardDragStart}
+                onDragEnd={handleBoardDragEnd}
+                onDrop={handleBoardDropWrapper}
+                isDragOver={draggedBoard?.projectId === null || false}
+              />
             ))}
           </div>
         </div>
