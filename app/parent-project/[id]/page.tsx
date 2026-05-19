@@ -1,18 +1,30 @@
-import { Suspense } from 'react';
-import { getServerSession } from 'next-auth';
-import { redirect, notFound } from 'next/navigation';
-import { authOptions } from '@/lib/auth';
-import { getProjectById, getProjectUsers } from '@/actions/project-actions';
-import { getProjectBoards } from '@/actions/board-actions';
-import { getProjectNotes } from '@/actions/note-actions';
-import { getUserById } from '@/actions/user-actions';
-import BoardsListClient from './BoardsListClient';
-import ParentProjectClient from './ParentProjectClient';
-import { ArrowLeft, FolderOpen, Users } from 'lucide-react';
-import Link from 'next/link';
-import ProjectNotesClient from './ProjectNotesClient';
+import { Suspense } from "react";
+import { getServerSession } from "next-auth";
+import { redirect, notFound } from "next/navigation";
+import { authOptions } from "@/lib/auth";
+import { getProjectById, getProjectUsers } from "@/actions/project-actions";
+import { getProjectBoards } from "@/actions/board-actions";
+import { getProjectNotes } from "@/actions/note-actions";
+import { getUserById } from "@/actions/user-actions";
+import BoardsListClient from "./BoardsListClient";
+import ParentProjectClient from "./ParentProjectClient";
+import {
+  ArrowLeft,
+  FolderOpen,
+  Users,
+  Calendar as CalendarIcon,
+} from "lucide-react";
+import Link from "next/link";
+import ProjectNotesClient from "./ProjectNotesClient";
+import ProjectCalendarClient from "./ProjectCalendarClient";
 
-async function BoardsList({ projectId, userId }: { projectId: string; userId: string }) {
+async function BoardsList({
+  projectId,
+  userId,
+}: {
+  projectId: string;
+  userId: string;
+}) {
   const result = await getProjectBoards(projectId, userId);
 
   if (!result.success || !result.data) {
@@ -45,15 +57,19 @@ async function BoardsList({ projectId, userId }: { projectId: string; userId: st
   }
 
   return (
-    <BoardsListClient 
-      projectId={projectId} 
-      userId={userId} 
-      boards={boards} 
-    />
+    <BoardsListClient projectId={projectId} userId={userId} boards={boards} />
   );
 }
 
-async function NotesList({ projectId, userId, userEmail }: { projectId: string; userId: string; userEmail?: string }) {
+async function NotesList({
+  projectId,
+  userId,
+  userEmail,
+}: {
+  projectId: string;
+  userId: string;
+  userEmail?: string;
+}) {
   const result = await getProjectNotes(projectId, userId);
 
   if (!result.success || !result.data) {
@@ -81,16 +97,16 @@ async function NotesList({ projectId, userId, userEmail }: { projectId: string; 
       if (ownerResult.success && ownerResult.data) {
         return {
           note,
-          ownerEmail: ownerResult.data.email || '',
-          ownerName: ownerResult.data.name || ''
+          ownerEmail: ownerResult.data.email || "",
+          ownerName: ownerResult.data.name || "",
         };
       }
       return {
         note,
-        ownerEmail: '',
-        ownerName: ''
+        ownerEmail: "",
+        ownerName: "",
       };
-    })
+    }),
   );
 
   return <ProjectNotesClient notes={notesWithOwnerInfo} userId={userId} />;
@@ -121,12 +137,16 @@ function BoardsLoading() {
   );
 }
 
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
-    redirect('/auth/login');
+    redirect("/auth/login");
   }
 
   const projectResult = await getProjectById(id);
@@ -141,7 +161,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const users = usersResult.success && usersResult.data ? usersResult.data : [];
 
   const boardsResult = await getProjectBoards(id, session.user.id);
-  const boards = boardsResult.success && boardsResult.data ? boardsResult.data : [];
+  const boards =
+    boardsResult.success && boardsResult.data ? boardsResult.data : [];
 
   const isOwner = project.owner.toString() === session.user.id;
 
@@ -202,7 +223,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Botón de crear tablero */}
-        <ParentProjectClient userId={session.user.id} parentId={id} ownerEmail={session.user.email} ownerName={session.user.name} />
+        <ParentProjectClient
+          userId={session.user.id}
+          parentId={id}
+          ownerEmail={session.user.email}
+          ownerName={session.user.name}
+        />
 
         {/* Lista de tableros */}
         <div className="mt-4 sm:mt-5">
@@ -220,11 +246,35 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             <h2 className="text-[15px] font-semibold text-[#1d1d1f] tracking-[-0.24px]">
               Notas del Proyecto
             </h2>
-            <ParentProjectClient userId={session.user.id} parentId={id} mode="note" ownerEmail={session.user.email} ownerName={session.user.name} />
+            <ParentProjectClient
+              userId={session.user.id}
+              parentId={id}
+              mode="note"
+              ownerEmail={session.user.email}
+              ownerName={session.user.name}
+            />
           </div>
           <Suspense fallback={<BoardsLoading />}>
-            <NotesList projectId={id} userId={session.user.id} userEmail={session.user.email} />
+            <NotesList
+              projectId={id}
+              userId={session.user.id}
+              userEmail={session.user.email}
+            />
           </Suspense>
+        </div>
+
+        {/* Separador */}
+        <div className="my-8 border-t border-gray-200" />
+
+        {/* Sección de calendario */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarIcon size={20} className="text-[#0066cc]" />
+            <h2 className="text-[15px] font-semibold text-[#1d1d1f] tracking-[-0.24px]">
+              Calendario de Tareas del Proyecto
+            </h2>
+          </div>
+          <ProjectCalendarClient projectId={id} userId={session.user.id} />
         </div>
       </div>
     </div>

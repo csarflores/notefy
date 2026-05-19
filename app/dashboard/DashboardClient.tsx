@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, LogOut, User, Folder, FileText } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, LogOut, User, Folder, FileText, Calendar } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import Button from '@/components/ui/Button';
 import CreateProjectModal from '@/components/dashboard/CreateProjectModal';
@@ -16,6 +17,7 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({ userId, userName, userEmail }: DashboardClientProps) {
+  const router = useRouter();
   const [isBoardModalOpen, setIsBoardModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -30,6 +32,14 @@ export default function DashboardClient({ userId, userName, userEmail }: Dashboa
       <div className="flex flex-col max-w-full sm:flex-row sm:items-center sm:justify-between gap-2">
         {/* Botones de creación - Visible solo en desktop */}
         <div className="hidden sm:flex gap-2">
+          <Button
+            onClick={() => router.push('/calendar')}
+            size="sm"
+            variant="secondary"
+          >
+            <Calendar size={15} className="mr-1.5" />
+            Calendario
+          </Button>
           <Button
             onClick={() => setIsProjectModalOpen(true)}
             size="sm"
@@ -77,6 +87,15 @@ export default function DashboardClient({ userId, userName, userEmail }: Dashboa
 
         {/* Botones - Visible solo en mobile, full width */}
         <div className="sm:hidden flex flex-col gap-2 w-full">
+          <Button
+            onClick={() => router.push('/calendar')}
+            size="sm"
+            variant="secondary"
+            className="w-full"
+          >
+            <Calendar size={15} className="mr-1.5" />
+            Calendario
+          </Button>
           <Button
             onClick={() => setIsProjectModalOpen(true)}
             size="sm"
