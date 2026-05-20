@@ -51,7 +51,7 @@ export default function TabBar() {
   };
 
   return (
-    <div className="h-9 bg-[#f0f0f2] border-b border-[#d1d1d6] flex items-end overflow-x-auto shrink-0 w-full">
+    <div className="h-9 bg-[#f0f0f2] border-b border-[#d1d1d6] flex items-end overflow-x-auto overflow-y-hidden shrink-0 w-full">
       {tabs.map((tab) => {
         const Icon = TAB_ICONS[tab.type] ?? LayoutDashboard;
         const isActive = tab.id === activeTabId;

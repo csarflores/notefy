@@ -21,7 +21,7 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
   const note = noteResult.data;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
+    <div className="w-full min-h-full overflow-x-hidden">
       <NoteEditorClient note={note} userId={session.user.id} />
     </div>
   );

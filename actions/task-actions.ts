@@ -1,9 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/mongodb';
 import Task from '@/models/Task';
-import { CreateTaskInput, UpdateTaskInput, ApiResponse, ITask } from '@/types';
+import { CreateTaskInput, UpdateTaskInput, ApiResponse, ITask, IComment, IReply } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
 
 // Obtener todas las tareas de un tablero
@@ -310,5 +312,206 @@ export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiRespons
   } catch (error) {
     console.error('Error al eliminar tareas:', error);
     return { success: false, error: 'Error al eliminar las tareas' };
+  }
+}
+
+// Agregar un comentario a una tarea
+export async function addComment(taskId: string, content: string): Promise<ApiResponse<IComment>> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    if (!isValidObjectId(taskId)) {
+      return { success: false, error: 'ID de tarea inválido' };
+    }
+
+    const trimmed = content?.trim();
+    if (!trimmed) {
+      return { success: false, error: 'El comentario no puede estar vacío' };
+    }
+    if (trimmed.length > 2000) {
+      return { success: false, error: 'El comentario no puede exceder 2000 caracteres' };
+    }
+
+    await connectDB();
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return { success: false, error: 'Tarea no encontrada' };
+    }
+
+    task.comments.push({
+      authorId: session.user.id,
+      authorName: session.user.name,
+      authorImage: session.user.image || null,
+      content: trimmed,
+    } as any);
+
+    await task.save();
+
+    const newComment = task.comments[task.comments.length - 1];
+    revalidatePath(`/board/${task.boardId}`);
+
+    return { success: true, data: JSON.parse(JSON.stringify(newComment)) };
+  } catch (error) {
+    console.error('Error al agregar comentario:', error);
+    return { success: false, error: 'Error al agregar el comentario' };
+  }
+}
+
+// Eliminar un comentario de una tarea (solo el autor puede eliminarlo)
+export async function deleteComment(taskId: string, commentId: string): Promise<ApiResponse<null>> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    if (!isValidObjectId(taskId) || !isValidObjectId(commentId)) {
+      return { success: false, error: 'ID inválido' };
+    }
+
+    await connectDB();
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return { success: false, error: 'Tarea no encontrada' };
+    }
+
+    const commentIndex = task.comments.findIndex(
+      (c: any) => c._id.toString() === commentId
+    );
+    if (commentIndex === -1) {
+      return { success: false, error: 'Comentario no encontrado' };
+    }
+
+    const comment = task.comments[commentIndex] as any;
+    if (comment.authorId.toString() !== session.user.id) {
+      return { success: false, error: 'No tienes permiso para eliminar este comentario' };
+    }
+
+    task.comments.splice(commentIndex, 1);
+    await task.save();
+
+    revalidatePath(`/board/${task.boardId}`);
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al eliminar comentario:', error);
+    return { success: false, error: 'Error al eliminar el comentario' };
+  }
+}
+
+// Agregar una respuesta a un comentario
+export async function addReply(
+  taskId: string,
+  commentId: string,
+  content: string
+): Promise<ApiResponse<IReply>> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    if (!isValidObjectId(taskId) || !isValidObjectId(commentId)) {
+      return { success: false, error: 'ID inválido' };
+    }
+
+    const trimmed = content?.trim();
+    if (!trimmed) {
+      return { success: false, error: 'La respuesta no puede estar vacía' };
+    }
+    if (trimmed.length > 2000) {
+      return { success: false, error: 'La respuesta no puede exceder 2000 caracteres' };
+    }
+
+    await connectDB();
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return { success: false, error: 'Tarea no encontrada' };
+    }
+
+    const commentIndex = task.comments.findIndex(
+      (c: any) => c._id.toString() === commentId
+    );
+    if (commentIndex === -1) {
+      return { success: false, error: 'Comentario no encontrado' };
+    }
+
+    const comment = task.comments[commentIndex] as any;
+    comment.replies.push({
+      authorId: session.user.id,
+      authorName: session.user.name,
+      authorImage: session.user.image || null,
+      content: trimmed,
+    });
+
+    await task.save();
+
+    const newReply = comment.replies[comment.replies.length - 1];
+    revalidatePath(`/board/${task.boardId}`);
+
+    return { success: true, data: JSON.parse(JSON.stringify(newReply)) };
+  } catch (error) {
+    console.error('Error al agregar respuesta:', error);
+    return { success: false, error: 'Error al agregar la respuesta' };
+  }
+}
+
+// Eliminar una respuesta (solo el autor puede eliminarla)
+export async function deleteReply(
+  taskId: string,
+  commentId: string,
+  replyId: string
+): Promise<ApiResponse<null>> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    if (!isValidObjectId(taskId) || !isValidObjectId(commentId) || !isValidObjectId(replyId)) {
+      return { success: false, error: 'ID inválido' };
+    }
+
+    await connectDB();
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return { success: false, error: 'Tarea no encontrada' };
+    }
+
+    const commentIndex = task.comments.findIndex(
+      (c: any) => c._id.toString() === commentId
+    );
+    if (commentIndex === -1) {
+      return { success: false, error: 'Comentario no encontrado' };
+    }
+
+    const comment = task.comments[commentIndex] as any;
+    const replyIndex = comment.replies.findIndex(
+      (r: any) => r._id.toString() === replyId
+    );
+    if (replyIndex === -1) {
+      return { success: false, error: 'Respuesta no encontrada' };
+    }
+
+    if (comment.replies[replyIndex].authorId.toString() !== session.user.id) {
+      return { success: false, error: 'No tienes permiso para eliminar esta respuesta' };
+    }
+
+    comment.replies.splice(replyIndex, 1);
+    await task.save();
+
+    revalidatePath(`/board/${task.boardId}`);
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al eliminar respuesta:', error);
+    return { success: false, error: 'Error al eliminar la respuesta' };
   }
 }

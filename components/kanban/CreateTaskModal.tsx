@@ -3,7 +3,6 @@
 import { useState, FormEvent, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/ui/Modal';
-import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
 import NoteEditor from '@/components/notes/NoteEditor';
@@ -17,9 +16,30 @@ import { generateRandomColor } from '@/lib/utils';
 interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projectId: string; // Still named projectId for compatibility, but used as boardId
+  projectId: string;
   defaultStatus?: 'todo' | 'in-progress' | 'done';
 }
+
+const STATUS_OPTIONS = [
+  {
+    value: 'todo',
+    label: 'Pendiente',
+    dot: '#8e8e93',
+    activeClass: 'bg-[#f5f5f7] text-[#3a3a3c] ring-1 ring-[#c7c7cc]',
+  },
+  {
+    value: 'in-progress',
+    label: 'En Proceso',
+    dot: '#0066cc',
+    activeClass: 'bg-[#e8f0fb] text-[#0055aa] ring-1 ring-[#0066cc]/25',
+  },
+  {
+    value: 'done',
+    label: 'Finalizado',
+    dot: '#34c759',
+    activeClass: 'bg-[#e6f9ec] text-[#1a7a33] ring-1 ring-[#34c759]/35',
+  },
+] as const;
 
 export default function CreateTaskModal({
   isOpen,
@@ -51,9 +71,7 @@ export default function CreateTaskModal({
   }, [isOpen, projectId]);
 
   useEffect(() => {
-    if (isOpen) {
-      setStatus(defaultStatus);
-    }
+    if (isOpen) setStatus(defaultStatus);
   }, [isOpen, defaultStatus]);
 
   const loadProjectData = async () => {
@@ -68,7 +86,6 @@ export default function CreateTaskModal({
         setAssignedTo([usersResult.data[0]._id.toString()]);
       }
     }
-
     if (tagsResult.success && tagsResult.data) {
       setProjectTags(tagsResult.data);
     }
@@ -76,46 +93,30 @@ export default function CreateTaskModal({
 
   const handleAddTag = () => {
     if (!newTagText.trim() || tags.length >= 5) return;
-
-    const newTag = {
-      text: newTagText.trim(),
-      color: generateRandomColor(),
-    };
-
-    // Verificar si ya existe en las etiquetas del proyecto
+    const newTag = { text: newTagText.trim(), color: generateRandomColor() };
     const tagExists = projectTags.some(
       (t) => t.text.toLowerCase() === newTag.text.toLowerCase()
     );
-
-    if (!tagExists) {
-      setProjectTags([...projectTags, newTag]);
-    }
-    
+    if (!tagExists) setProjectTags([...projectTags, newTag]);
     setTags([...tags, newTag]);
     setNewTagText('');
   };
 
   const handleToggleTag = (tag: ITag) => {
-    const isSelected = tags.some(t => t.text === tag.text);
+    const isSelected = tags.some((t) => t.text === tag.text);
     if (isSelected) {
-      setTags(tags.filter(t => t.text !== tag.text));
-    } else {
-      if (tags.length < 5) {
-        setTags([...tags, tag]);
-      }
+      setTags(tags.filter((t) => t.text !== tag.text));
+    } else if (tags.length < 5) {
+      setTags([...tags, tag]);
     }
   };
 
   const handleToggleUser = (userId: string) => {
     if (assignedTo.includes(userId)) {
-      setAssignedTo(assignedTo.filter(id => id !== userId));
+      setAssignedTo(assignedTo.filter((id) => id !== userId));
     } else {
       setAssignedTo([...assignedTo, userId]);
     }
-  };
-
-  const handleRemoveTag = (index: number) => {
-    setTags(tags.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -126,15 +127,12 @@ export default function CreateTaskModal({
       setError('El título es requerido');
       return;
     }
-
-    // Check description length (HTML includes formatting tags)
     if (description.length > 50000) {
-      setError('La descripción excede el límite de 50,000 caracteres. El editor de texto rico incluye etiquetas HTML de formato, negritas, enlaces, etc., que aumentan el conteo de caracteres. Intenta reducir el contenido o eliminar formato excesivo.');
+      setError('La descripción excede el límite de 50,000 caracteres.');
       return;
     }
 
     setIsLoading(true);
-
     try {
       const result = await createTask({
         title: title.trim(),
@@ -160,7 +158,7 @@ export default function CreateTaskModal({
       } else {
         setError(result.error || 'Error al crear la tarea');
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al crear la tarea');
     } finally {
       setIsLoading(false);
@@ -185,94 +183,103 @@ export default function CreateTaskModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
+      className="max-w-xl"
       headerContent={
-        <div className="flex items-center justify-between px-5 py-3">
+        <div className="flex items-center gap-3 px-6 py-4">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="text-[17px] font-semibold text-[#1d1d1f] tracking-[-0.374px] border-none outline-none bg-transparent w-full max-w-md"
-            placeholder="Nombre de la tarea"
+            className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight border-none outline-none bg-transparent w-full placeholder:text-[#c7c7cc] placeholder:font-normal"
+            placeholder="Nombre de la tarea..."
             required
             disabled={isLoading}
+            autoFocus
           />
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
               type="button"
-              variant="primary"
-              isLoading={isLoading}
-              size="sm"
-              className="text-[13px] py-1.5"
               onClick={() => formRef.current?.requestSubmit()}
+              disabled={isLoading || !title.trim()}
+              className="px-4 py-1.5 rounded-lg bg-[#0066cc] text-white text-[13px] font-medium hover:bg-[#0055aa] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
-              Crear
-            </Button>
+              {isLoading ? 'Creando…' : 'Crear'}
+            </button>
             <button
               onClick={handleClose}
               disabled={isLoading}
-              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
-              title="Cerrar"
+              className="text-[#aaaaaa] hover:text-[#1d1d1f] transition-colors disabled:opacity-40"
             >
-              <X size={18} className="text-[#7a7a7a]" />
+              <X size={17} />
             </button>
           </div>
         </div>
       }
     >
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-2.5">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+
         {/* Estado */}
         <div>
-          <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
+          <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-2">
             Estado
-          </label>
+          </p>
           <div className="flex gap-1.5">
-            {[
-              { value: 'todo', label: 'Pendiente' },
-              { value: 'in-progress', label: 'En Proceso' },
-              { value: 'done', label: 'Finalizado' },
-            ].map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setStatus(option.value as any)}
-                className={`flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all tracking-[-0.12px] ${
-                  status === option.value
-                    ? 'bg-[#0066cc] text-white'
-                    : 'bg-[#f5f5f7] text-[#1d1d1f] hover:bg-[#e0e0e0]'
-                }`}
-                disabled={isLoading}
-              >
-                {option.label}
-              </button>
-            ))}
+            {STATUS_OPTIONS.map((option) => {
+              const isActive = status === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setStatus(option.value)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-medium transition-all ${
+                    isActive
+                      ? option.activeClass
+                      : 'text-[#8e8e93] hover:bg-[#f5f5f7]'
+                  }`}
+                  disabled={isLoading}
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0 transition-colors"
+                    style={{ backgroundColor: isActive ? option.dot : '#d1d1d6' }}
+                  />
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Fechas */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="dueDate" className="block text-[12px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
-              Fecha Máximo
+            <label
+              htmlFor="dueDate"
+              className="block text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-1.5"
+            >
+              Fecha límite
             </label>
             <input
               id="dueDate"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded-lg border border-[#e0e0e0] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none transition-all text-[11px] text-[#1d1d1f]"
+              className="w-full px-3 py-2 rounded-lg border border-[#e5e5ea] focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/10 outline-none transition-all text-[13px] text-[#1d1d1f] bg-white"
               disabled={isLoading}
             />
           </div>
           <div>
-            <label htmlFor="deliveryDate" className="block text-[12px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
-              Fecha Entrega
+            <label
+              htmlFor="deliveryDate"
+              className="block text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-1.5"
+            >
+              Fecha entrega
             </label>
             <input
               id="deliveryDate"
               type="date"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded-lg border border-[#e0e0e0] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none transition-all text-[11px] text-[#1d1d1f]"
+              className="w-full px-3 py-2 rounded-lg border border-[#e5e5ea] focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/10 outline-none transition-all text-[13px] text-[#1d1d1f] bg-white"
               disabled={isLoading}
             />
           </div>
@@ -281,51 +288,54 @@ export default function CreateTaskModal({
         {/* Asignar miembros */}
         {boardUsers.length > 1 && (
           <div>
-            <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
+            <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-2">
               Asignar a
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {boardUsers.map((user) => (
-                <button
-                  key={user._id.toString()}
-                  type="button"
-                  onClick={() => handleToggleUser(user._id.toString())}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all ${
-                    assignedTo.includes(user._id.toString())
-                      ? 'border-[#0066cc] bg-[#0066cc]/5'
-                      : 'border-[#e0e0e0] hover:border-[#7a7a7a]'
-                  }`}
-                  disabled={isLoading}
-                >
-                  <Avatar src={user.image} name={user.name} size="sm" />
-                  <span className="text-[12px] text-[#1d1d1f] tracking-[-0.12px]">{user.name}</span>
-                  {assignedTo.includes(user._id.toString()) && (
-                    <Check size={12} className="text-[#0066cc]" />
-                  )}
-                </button>
-              ))}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {boardUsers.map((user) => {
+                const isSelected = assignedTo.includes(user._id.toString());
+                return (
+                  <button
+                    key={user._id.toString()}
+                    type="button"
+                    onClick={() => handleToggleUser(user._id.toString())}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[12px] transition-all ${
+                      isSelected
+                        ? 'border-[#0066cc] bg-[#e8f0fb] text-[#0055aa]'
+                        : 'border-[#e5e5ea] text-[#3a3a3c] hover:border-[#c7c7cc]'
+                    }`}
+                    disabled={isLoading}
+                  >
+                    <Avatar src={user.image} name={user.name} size="sm" />
+                    <span>{user.name}</span>
+                    {isSelected && <Check size={11} className="text-[#0066cc]" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Tags */}
+        {/* Etiquetas */}
         <div>
-          <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
-            Etiquetas (máx. 5)
-          </label>
-          
-          {/* Etiquetas del proyecto */}
+          <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-2">
+            Etiquetas{' '}
+            <span className="normal-case font-normal text-[#c7c7cc]">
+              ({tags.length}/5)
+            </span>
+          </p>
+
           {projectTags.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 mb-2">
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
               {projectTags.map((tag, index) => {
-                const isSelected = tags.some(t => t.text === tag.text);
+                const isSelected = tags.some((t) => t.text === tag.text);
                 return (
                   <button
                     key={index}
                     type="button"
                     onClick={() => handleToggleTag(tag)}
-                    className={`cursor-pointer transition-all text-[11px] ${
-                      isSelected ? 'ring-1 ring-[#0066cc]' : 'hover:opacity-80'
+                    className={`transition-opacity ${
+                      isSelected ? 'opacity-100' : 'opacity-40 hover:opacity-70'
                     }`}
                     disabled={isLoading || (!isSelected && tags.length >= 5)}
                   >
@@ -337,42 +347,42 @@ export default function CreateTaskModal({
               })}
             </div>
           ) : (
-            <p className="text-[12px] text-[#7a7a7a] mb-2 tracking-[-0.12px]">No hay etiquetas en este proyecto</p>
+            <p className="text-[12px] text-[#c7c7cc] mb-2.5">
+              Sin etiquetas en este proyecto
+            </p>
           )}
 
-          {/* Crear nueva etiqueta */}
           <div className="flex gap-1.5">
             <input
               type="text"
               value={newTagText}
               onChange={(e) => setNewTagText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-              className="flex-1 px-3 py-1.5 rounded-lg border border-[#e0e0e0] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none transition-all text-[12px]"
-              placeholder="Nueva etiqueta"
+              onKeyDown={(e) =>
+                e.key === 'Enter' && (e.preventDefault(), handleAddTag())
+              }
+              className="flex-1 px-3 py-2 rounded-lg border border-[#e5e5ea] focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/10 outline-none transition-all text-[12px] placeholder:text-[#c7c7cc]"
+              placeholder="Nueva etiqueta..."
               maxLength={30}
               disabled={isLoading || tags.length >= 5}
             />
-            <Button
+            <button
               type="button"
               onClick={handleAddTag}
-              variant="secondary"
-              size="sm"
               disabled={!newTagText.trim() || isLoading || tags.length >= 5}
+              className="px-3 py-2 rounded-lg border border-[#e5e5ea] text-[#8e8e93] hover:border-[#0066cc] hover:text-[#0066cc] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             >
               <Plus size={14} />
-            </Button>
+            </button>
           </div>
-          <p className="text-xs text-[#7a7a7a] mt-1">
-            Las etiquetas se comparten con todas las tareas del proyecto
-          </p>
         </div>
 
         {/* Descripción */}
         <div>
-          <label htmlFor="description" className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
-            Descripción <span className="font-light text-[12px] text-[#7a7a7a]">(opcional)</span>
-          </label>
-          <div className="w-full rounded-lg focus:ring-1 focus:ring-[#0066cc]/20 outline-none transition-all min-h-[80px]">
+          <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-2">
+            Descripción{' '}
+            <span className="normal-case font-normal text-[#c7c7cc]">(opcional)</span>
+          </p>
+          <div className="rounded-lg border border-[#e5e5ea] overflow-hidden focus-within:border-[#0066cc] focus-within:ring-2 focus-within:ring-[#0066cc]/10 transition-all">
             <NoteEditor
               content={description}
               onChange={setDescription}
@@ -380,14 +390,15 @@ export default function CreateTaskModal({
               placeholder="Descripción de la tarea..."
               maxLength={50000}
               showCharCount={true}
+              minHeight="120px"
             />
           </div>
         </div>
 
         {/* Error */}
         {error && (
-          <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-[12px] text-red-600 tracking-[-0.12px]">{error}</p>
+          <div className="px-3 py-2.5 bg-red-50 border border-red-100 rounded-lg">
+            <p className="text-[12px] text-red-500">{error}</p>
           </div>
         )}
       </form>

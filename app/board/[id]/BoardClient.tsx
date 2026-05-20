@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2, LayoutGrid, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import TabBar from '@/components/tabs/TabBar';
-import Button from '@/components/ui/Button';
 import CreateTaskModal from '@/components/kanban/CreateTaskModal';
 import EditTaskModal from '@/components/kanban/EditTaskModal';
 import EditBoardModal from '@/components/dashboard/EditBoardModal';
@@ -57,116 +55,103 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
   return (
     <>
       {/* Header del tablero */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm w-full overflow-x-hidden">
-        <TabBar />
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              {/* Botón volver */}
-              <button
-                onClick={() => router.push(board.projectId ? `/parent-project/${board.projectId}` : '/dashboard')}
-                className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
-              >
-                <ArrowLeft size={18} className="text-[#7a7a7a]" />
-              </button>
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-20 w-full">
+        <div className="w-full px-2 sm:px-5 h-11 flex items-center gap-1.5">
 
-              {/* Información del tablero */}
-              <div className="min-w-0 flex-1">
-                <h1 className="text-[20px] sm:text-[24px] font-semibold text-[#1d1d1f] mb-0.5 tracking-tight truncate">
-                  {board.name}
-                </h1>
-                {board.description && (
-                  <p className="text-[12px] sm:text-[13px] text-[#7a7a7a] tracking-[-0.12px] truncate">{board.description}</p>
-                )}
-                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] sm:text-[12px] text-[#7a7a7a]">
-                  <Users size={12} className="shrink-0" />
-                  <span>
-                    {board.members.length} miembro{board.members.length > 1 ? 's' : ''}
-                  </span>
+          {/* Volver */}
+          <button
+            onClick={() => router.push(board.projectId ? `/parent-project/${board.projectId}` : '/dashboard')}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[#7a7a7a] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition-all shrink-0 group"
+          >
+            <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
+          </button>
+
+          {/* Separador */}
+          <div className="w-px h-4 bg-[#e5e5e5] shrink-0" />
+
+          {/* Título */}
+          <div className="flex items-center gap-2 min-w-0 flex-1 px-1">
+            <span className="text-[14px] font-semibold text-[#1d1d1f] tracking-tight truncate leading-none">
+              {board.name}
+            </span>
+            <span className="hidden sm:flex items-center gap-1 shrink-0 text-[11px] text-[#a0a0a8] bg-[#f5f5f7] px-1.5 py-0.5 rounded-md font-medium">
+              <Users size={10} />
+              {board.members.length}
+            </span>
+          </div>
+
+          {/* Toggle de vista */}
+          <div className="flex items-center bg-[#f5f5f7] rounded-lg p-0.5 shrink-0">
+            <button
+              onClick={() => setView('kanban')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all duration-150 ${
+                view === 'kanban'
+                  ? 'bg-white text-[#1d1d1f] shadow-sm'
+                  : 'text-[#a0a0a8] hover:text-[#1d1d1f]'
+              }`}
+            >
+              <LayoutGrid size={13} />
+              <span className="hidden sm:inline">Tablero</span>
+            </button>
+            <button
+              onClick={() => setView('calendar')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all duration-150 ${
+                view === 'calendar'
+                  ? 'bg-white text-[#1d1d1f] shadow-sm'
+                  : 'text-[#a0a0a8] hover:text-[#1d1d1f]'
+              }`}
+            >
+              <Calendar size={13} />
+              <span className="hidden sm:inline">Calendario</span>
+            </button>
+          </div>
+
+          {/* Nueva tarea */}
+          <button
+            onClick={() => setIsTaskModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0055b3] active:bg-[#004499] text-white rounded-lg text-[12px] font-medium transition-colors shrink-0 shadow-sm"
+          >
+            <Plus size={13} strokeWidth={2.5} />
+            <span className="hidden sm:inline">Nueva Tarea</span>
+          </button>
+
+          {/* Menú de opciones */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowBoardMenu(!showBoardMenu)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                showBoardMenu ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'text-[#a0a0a8] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'
+              }`}
+            >
+              <MoreVertical size={15} />
+            </button>
+
+            {showBoardMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowBoardMenu(false)} />
+                <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-[#e5e5e5] overflow-hidden z-50">
+                  <div className="p-1">
+                    <button
+                      onClick={() => { setShowBoardMenu(false); setShowEditModal(true); }}
+                      className="w-full px-3 py-2 text-left text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2.5 rounded-lg transition-colors"
+                    >
+                      <Edit2 size={13} className="text-[#7a7a7a]" />
+                      Editar tablero
+                    </button>
+                  </div>
+                  <div className="h-px bg-[#f0f0f0] mx-1" />
+                  <div className="p-1">
+                    <button
+                      onClick={() => { setShowBoardMenu(false); setShowDeleteDialog(true); }}
+                      className="w-full px-3 py-2 text-left text-[13px] text-red-500 hover:bg-red-50 flex items-center gap-2.5 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={13} />
+                      Eliminar tablero
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Acciones */}
-            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto z-10">
-              {/* Toggle de vista */}
-              <div className="flex items-center bg-[#f5f5f7] rounded-lg p-0.5">
-                <button
-                  onClick={() => setView('kanban')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-all ${
-                    view === 'kanban'
-                      ? 'bg-white text-[#1d1d1f] shadow-sm'
-                      : 'text-[#7a7a7a] hover:text-[#1d1d1f]'
-                  }`}
-                >
-                  <LayoutGrid size={14} />
-                  <span className="hidden sm:inline">Tablero</span>
-                </button>
-                <button
-                  onClick={() => setView('calendar')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-all ${
-                    view === 'calendar'
-                      ? 'bg-white text-[#1d1d1f] shadow-sm'
-                      : 'text-[#7a7a7a] hover:text-[#1d1d1f]'
-                  }`}
-                >
-                  <Calendar size={14} />
-                  <span className="hidden sm:inline">Calendario</span>
-                </button>
-              </div>
-
-              {/* Botón nueva tarea */}
-              <Button
-                onClick={() => setIsTaskModalOpen(true)}
-                size="sm"
-                className="flex-1 sm:flex-none text-[13px] py-1.5"
-              >
-                <Plus size={15} className="sm:mr-1.5" />
-                <span className="hidden sm:inline">Nueva Tarea</span>
-                <span className="sm:hidden">Tarea</span>
-              </Button>
-
-              {/* Menú de opciones del tablero */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowBoardMenu(!showBoardMenu)}
-                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <MoreVertical size={18} className="text-[#7a7a7a]" />
-                </button>
-
-                {showBoardMenu && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowBoardMenu(false)}
-                    />
-                    <div className="fixed right-4 top-16 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
-                      <button
-                        onClick={() => {
-                          setShowBoardMenu(false);
-                          setShowEditModal(true);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-[#1d1d1f] hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <Edit2 size={14} />
-                        Editar Tablero
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowBoardMenu(false);
-                          setShowDeleteDialog(true);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
-                      >
-                        <Trash2 size={14} />
-                        Eliminar Tablero
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>

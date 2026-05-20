@@ -44,31 +44,31 @@ export default function ConfirmModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+      <div className="bg-white w-full max-w-sm rounded-2xl shadow-[0_16px_48px_-8px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.06] overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-gray-100">
+        <div className="px-6 pt-6 pb-4">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <AlertTriangle size={24} className={iconColors[variant]} />
-              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle size={18} className={iconColors[variant]} />
+              <h3 className="text-[15px] font-semibold text-[#1d1d1f]">{title}</h3>
             </div>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              className="text-[#aaaaaa] hover:text-[#1d1d1f] transition-colors"
             >
-              <X size={18} className="text-gray-400" />
+              <X size={16} />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="p-6">
-          <p className="text-gray-600">{message}</p>
+        <div className="px-6 pb-5">
+          <p className="text-sm text-[#7a7a7a] leading-relaxed">{message}</p>
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-gray-50 flex justify-end gap-3">
+        <div className="px-6 pb-6 flex justify-end gap-2.5">
           <Button
             onClick={onClose}
             variant="secondary"

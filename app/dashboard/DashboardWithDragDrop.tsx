@@ -185,6 +185,8 @@ export default function DashboardWithDragDrop({
                 note={note}
                 onOpenNote={() => handleNoteClick(note, ownerEmail, ownerName)}
                 isOwner={true}
+                userId={userId}
+                onDelete={() => router.refresh()}
               />
             ))}
           </div>

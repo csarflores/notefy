@@ -92,7 +92,7 @@ export default function UpcomingTasks({ tasks, onTaskClick }: UpcomingTasksProps
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-[#1d1d1f] mb-2 truncate">
+                  <h3 className={`font-medium text-[#1d1d1f] mb-2 truncate${task.status === 'done' ? ' line-through opacity-60' : ''}`}>
                     {task.title}
                   </h3>
                   

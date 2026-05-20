@@ -100,7 +100,7 @@ async function BoardContent({ boardId }: { boardId: string }) {
 
 function BoardLoading() {
   return (
-    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden">
+    <div className="w-full min-h-full overflow-x-hidden">
       {/* Header skeleton */}
       <div className="bg-white border-b border-gray-100 w-full">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
@@ -150,7 +150,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   const { id } = await params;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
+    <div className="w-full min-h-full overflow-x-hidden w-full">
       <Suspense fallback={<BoardLoading />}>
         <BoardContent boardId={id} />
       </Suspense>

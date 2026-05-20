@@ -44,6 +44,27 @@ export interface ITag {
   color: string;
 }
 
+// Tipos para Reply (respuesta a un comentario)
+export interface IReply {
+  _id: Types.ObjectId;
+  authorId: Types.ObjectId;
+  authorName: string;
+  authorImage?: string;
+  content: string;
+  createdAt: Date;
+}
+
+// Tipos para Comment (subdocumento embebido en Task)
+export interface IComment {
+  _id: Types.ObjectId;
+  authorId: Types.ObjectId;
+  authorName: string;
+  authorImage?: string;
+  content: string;
+  replies: IReply[];
+  createdAt: Date;
+}
+
 // Tipos para Task
 export interface ITask extends Document {
   _id: Types.ObjectId;
@@ -54,6 +75,7 @@ export interface ITask extends Document {
   assignedTo: Types.ObjectId[];
   imageUrl?: string;
   tags: ITag[];
+  comments: IComment[];
   order: number;
   dueDate?: Date | null;
   deliveryDate?: Date | null;

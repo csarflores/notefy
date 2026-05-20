@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Folder, MoreVertical, Edit2, Trash2, ChevronRight } from 'lucide-react';
+import { MoreHorizontal, Edit2, Trash2, ChevronRight, Folder, ExternalLink } from 'lucide-react';
 import EditProjectModal from './EditProjectModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { deleteProject } from '@/actions/project-actions';
 import { IProject } from '@/types';
 import { formatDate } from '@/lib/utils';
-import { getProjectGradient } from '@/constants/project-colors';
 import { useTabContext } from '@/components/tabs/TabContext';
+import SidebarContextMenu from '@/components/layout/SidebarContextMenu';
 
 interface ProjectCardProps {
   project: IProject;
@@ -20,11 +20,13 @@ interface ProjectCardProps {
 export default function ProjectCard({ project, boardCount, onBoardDrop }: ProjectCardProps) {
   const router = useRouter();
   const { openTab } = useTabContext();
-  const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isOver, setIsOver] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const color = project.color || '#0066cc';
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -41,151 +43,125 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
     }
   };
 
-  const handleEdit = () => {
-    setShowMenu(false);
-    setShowEditModal(true);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsOver(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsOver(false);
-  };
-
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsOver(true); };
+  const handleDragLeave = () => setIsOver(false);
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsOver(false);
     const boardId = e.dataTransfer.getData('boardId');
-    if (boardId && onBoardDrop) {
-      onBoardDrop(boardId, project._id.toString());
-    }
+    if (boardId && onBoardDrop) onBoardDrop(boardId, project._id.toString());
   };
 
-  
+  const handleOpen = () => {
+    openTab({
+      id: `project-${project._id}`,
+      type: 'project',
+      title: project.name,
+      url: `/parent-project/${project._id}`,
+      resourceId: project._id.toString(),
+    });
+    router.push(`/parent-project/${project._id}`);
+  };
+
   return (
     <>
-    {/* Tarjeta de Proyecto - Diseño distintivo con gradiente y más prominente */}
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`bg-gradient-to-br ${getProjectGradient(project.color)} rounded-lg p-3 shadow-md hover:shadow-lg transition-all duration-200 relative group ${
-        isOver ? 'ring-4 ring-white ring-opacity-50 scale-105' : ''
-      }`}
-    >
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-start gap-2 flex-1 min-w-0">
-          {/* Ícono de carpeta */}
-          <div className="p-1.5 bg-white/10 rounded-lg backdrop-blur-sm shrink-0">
-            <Folder size={16} className="text-white" />
-          </div>
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
+        className={`group relative bg-white rounded-xl border border-[#e0e0e0] overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer ${
+          isOver ? 'ring-2 ring-[#0066cc] ring-offset-1' : ''
+        }`}
+        onClick={handleOpen}
+      >
+        {/* Color accent — left border */}
+        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl" style={{ backgroundColor: color }} />
 
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-bold text-white mb-0.5 tracking-[-0.32px] truncate">
-              {project.name}
-            </h3>
-            {project.description && (
-              <p className="text-[11px] text-white/80 line-clamp-1 tracking-[-0.12px]">
-                {project.description}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="relative shrink-0 ml-1.5">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="p-1 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            <MoreVertical size={14} className="text-white" />
-          </button>
-
-          {showMenu && (
-            <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
-              <button
-                onClick={handleEdit}
-                className="w-full px-3 py-2 text-left text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2 tracking-[-0.12px]"
+        <div className="pl-4 pr-3 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                style={{ backgroundColor: color + '1a' }}
               >
-                <Edit2 size={14} />
-                Editar
-              </button>
+                <Folder size={13} style={{ color }} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-[14px] font-semibold text-[#1d1d1f] truncate tracking-[-0.2px]">
+                  {project.name}
+                </h3>
+                {project.description && (
+                  <p className="text-[11px] text-[#7a7a7a] line-clamp-1 mt-0.5">
+                    {project.description}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Menu */}
+            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
               <button
-                onClick={() => {
-                  setShowMenu(false);
-                  setShowDeleteDialog(true);
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setCtxMenu({ x: rect.left, y: rect.bottom + 4 });
                 }}
-                className="w-full px-3 py-2 text-left text-[12px] text-red-500 hover:bg-red-50 flex items-center gap-2 tracking-[-0.12px]"
+                className="p-1 rounded-md hover:bg-[#f5f5f7] transition-colors opacity-0 group-hover:opacity-100"
               >
-                <Trash2 size={14} />
-                Eliminar
+                <MoreHorizontal size={14} className="text-[#7a7a7a]" />
               </button>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Contador de tableros */}
-      <div className="flex items-center justify-between pt-2 border-t border-white/20">
-        <div className="flex items-center gap-1.5">
-          <div className="px-2 py-1 bg-white/15 backdrop-blur-sm rounded-lg">
-            <span className="text-[11px] font-semibold text-white tracking-[-0.12px]">
-              {boardCount} {boardCount === 1 ? 'Tablero' : 'Tableros'}
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[#f0f0f2]">
+            <span className="text-[11px] text-[#a0a0a8]">
+              {boardCount} {boardCount === 1 ? 'tablero' : 'tableros'} · {formatDate(project.updatedAt)}
+            </span>
+            <span className="flex items-center gap-0.5 text-[11px] font-medium opacity-0 group-hover:opacity-100 transition-opacity" style={{ color }}>
+              Abrir <ChevronRight size={11} />
             </span>
           </div>
-          <span className="text-[10px] text-white/70 tracking-[-0.08px]">
-            {formatDate(project.updatedAt)}
-          </span>
         </div>
-
-        <button
-          onClick={() => {
-            openTab({
-              id: `project-${project._id}`,
-              type: 'project',
-              title: project.name,
-              url: `/parent-project/${project._id}`,
-              resourceId: project._id.toString(),
-            });
-            router.push(`/parent-project/${project._id}`);
-          }}
-          className="flex items-center gap-1 text-[11px] font-medium text-white hover:text-white/80 transition-colors tracking-[-0.12px]"
-        >
-          Ver tableros
-          <ChevronRight size={12} />
-        </button>
       </div>
-    </div>
 
-    {/* Modal de edición */}
-    <EditProjectModal
-      isOpen={showEditModal}
-      onClose={() => setShowEditModal(false)}
-      project={project}
-    />
+      {ctxMenu && (
+        <SidebarContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={[
+            { label: 'Editar', icon: Edit2, onClick: () => setShowEditModal(true) },
+            { label: 'Abrir', icon: ExternalLink, onClick: handleOpen },
+            { label: 'Eliminar', icon: Trash2, onClick: () => setShowDeleteDialog(true), variant: 'danger', separator: true },
+          ]}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
 
-    {/* Diálogo de confirmación de eliminación */}
-    <ConfirmDialog
-      isOpen={showDeleteDialog}
-      onClose={() => setShowDeleteDialog(false)}
-      onConfirm={handleDelete}
-      title="Eliminar Proyecto"
-      message={
-        <div className="space-y-2">
-          <p className="text-[#7a7a7a]">
-            ¿Estás seguro de que deseas eliminar el proyecto <strong>"{project.name}"</strong>?
-          </p>
-          <p className="text-sm text-red-500">
-            Esta acción eliminará permanentemente el proyecto, sus {boardCount} tablero{boardCount === 1 ? '' : 's'} y todas sus tareas.
-          </p>
-        </div>
-      }
-      confirmText="Eliminar"
-      isLoading={isDeleting}
-      variant="danger"
-    />
-  </>
+      <EditProjectModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        project={project}
+      />
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDelete}
+        title="Eliminar Proyecto"
+        message={
+          <div className="space-y-2">
+            <p className="text-[#7a7a7a]">
+              ¿Eliminar el proyecto <strong>"{project.name}"</strong>?
+            </p>
+            <p className="text-sm text-red-500">
+              Se eliminarán permanentemente sus {boardCount} tablero{boardCount === 1 ? '' : 's'} y todas sus tareas.
+            </p>
+          </div>
+        }
+        confirmText="Eliminar"
+        isLoading={isDeleting}
+        variant="danger"
+      />
+    </>
   );
 }

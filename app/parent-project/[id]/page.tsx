@@ -9,16 +9,13 @@ import { getUserById } from "@/actions/user-actions";
 import BoardsListClient from "./BoardsListClient";
 import ParentProjectClient from "./ParentProjectClient";
 import {
-  ArrowLeft,
   FolderOpen,
   Users,
   Calendar as CalendarIcon,
 } from "lucide-react";
-import Link from "next/link";
 import ProjectNotesClient from "./ProjectNotesClient";
 import ProjectCalendarClient from "./ProjectCalendarClient";
 import TabSyncer from "@/components/tabs/TabSyncer";
-import TabBar from "@/components/tabs/TabBar";
 
 async function BoardsList({
   projectId,
@@ -169,7 +166,7 @@ export default async function ProjectPage({
   const isOwner = project.owner.toString() === session.user.id;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
+    <div className="w-full min-h-full">
       <TabSyncer
         id={`project-${id}`}
         type="project"
@@ -177,18 +174,7 @@ export default async function ProjectPage({
         url={`/parent-project/${id}`}
         resourceId={id}
       />
-      <div className="sticky top-0 z-50 bg-white border-b border-[#e0e0e0] shadow-sm">
-        <TabBar />
-      </div>
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
-        {/* Navegación de regreso */}
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 text-[13px] text-[#0066cc] hover:text-[#0071e3] mb-4 transition-colors"
-        >
-          <ArrowLeft size={16} />
-          Volver al Dashboard
-        </Link>
 
         {/* Header */}
         <div className="mb-4 sm:mb-5">

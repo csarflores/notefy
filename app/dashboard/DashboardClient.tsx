@@ -1,13 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, LogOut, User, Folder, FileText, Calendar } from 'lucide-react';
-import { signOut } from 'next-auth/react';
-import Button from '@/components/ui/Button';
-import CreateProjectModal from '@/components/dashboard/CreateProjectModal';
-import CreateBoardModal from '@/components/dashboard/CreateBoardModal';
+import { useState, useRef, useEffect } from 'react';
+import { Plus, Folder, LayoutGrid, FileText } from 'lucide-react';
 import CreateProjectGroupModal from '@/components/dashboard/CreateProjectGroupModal';
+import CreateBoardModal from '@/components/dashboard/CreateBoardModal';
 import CreateNoteModal from '@/components/notes/CreateNoteModal';
 
 interface DashboardClientProps {
@@ -17,129 +13,86 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({ userId, userName, userEmail }: DashboardClientProps) {
-  const router = useRouter();
-  const [isBoardModalOpen, setIsBoardModalOpen] = useState(false);
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [projectModal, setProjectModal] = useState(false);
+  const [boardModal, setBoardModal] = useState(false);
+  const [noteModal, setNoteModal] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/auth/login' });
-  };
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const options = [
+    {
+      icon: <Folder size={15} className="text-[#0066cc]" />,
+      label: 'Nuevo Proyecto',
+      desc: 'Agrupa tableros y notas',
+      action: () => { setOpen(false); setProjectModal(true); },
+    },
+    {
+      icon: <LayoutGrid size={15} className="text-[#8b5cf6]" />,
+      label: 'Nuevo Tablero',
+      desc: 'Organiza tareas en Kanban',
+      action: () => { setOpen(false); setBoardModal(true); },
+    },
+    {
+      icon: <FileText size={15} className="text-[#10b981]" />,
+      label: 'Nueva Nota',
+      desc: 'Escribe con editor de texto',
+      action: () => { setOpen(false); setNoteModal(true); },
+    },
+  ];
 
   return (
     <>
-      {/* Mobile-first header */}
-      <div className="flex flex-col max-w-full sm:flex-row sm:items-center sm:justify-between gap-2">
-        {/* Botones de creación - Visible solo en desktop */}
-        <div className="hidden sm:flex gap-2">
-          <Button
-            onClick={() => router.push('/calendar')}
-            size="sm"
-            variant="secondary"
-          >
-            <Calendar size={15} className="mr-1.5" />
-            Calendario
-          </Button>
-          <Button
-            onClick={() => setIsProjectModalOpen(true)}
-            size="sm"
-            variant="secondary"
-          >
-            <Folder size={15} className="mr-1.5" />
-            Nuevo Proyecto
-          </Button>
-          <Button
-            onClick={() => setIsBoardModalOpen(true)}
-            size="sm"
-          >
-            <Plus size={15} className="mr-1.5" />
-            Nuevo Tablero
-          </Button>
-          <Button
-            onClick={() => setIsNoteModalOpen(true)}
-            size="sm"
-            variant="secondary"
-          >
-            <FileText size={15} className="mr-1.5" />
-            Nueva Nota
-          </Button>
-        </div>
+      <div ref={menuRef} className="relative inline-block">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0052a3] text-white text-[13px] font-medium rounded-lg transition-colors shadow-sm"
+        >
+          <Plus size={15} />
+          Nuevo
+        </button>
 
-        {/* Usuario y acciones - Stack en mobile, row en desktop */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-          {/* Usuario */}
-          <div className="flex items-center gap-1.5 text-[12px] text-[#7a7a7a] tracking-[-0.12px]">
-            <User size={14} className="shrink-0" />
-            <span className="truncate max-w-[140px] sm:max-w-none">{userName}</span>
+        {open && (
+          <div className="absolute left-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-lg border border-[#e0e0e0] py-1.5 z-50">
+            {options.map((opt) => (
+              <button
+                key={opt.label}
+                onClick={opt.action}
+                className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-[#f5f5f7] transition-colors text-left"
+              >
+                <div className="mt-0.5 shrink-0">{opt.icon}</div>
+                <div>
+                  <p className="text-[13px] font-medium text-[#1d1d1f]">{opt.label}</p>
+                  <p className="text-[11px] text-[#7a7a7a]">{opt.desc}</p>
+                </div>
+              </button>
+            ))}
           </div>
-
-          {/* Botón cerrar sesión */}
-          <Button
-            onClick={handleSignOut}
-            variant="secondary"
-            size="sm"
-            className="text-[#7a7a7a] hover:text-[#1d1d1f]"
-          >
-            <LogOut size={14} className="sm:mr-1.5" />
-            <span className="hidden sm:inline">Cerrar Sesión</span>
-          </Button>
-        </div>
-
-        {/* Botones - Visible solo en mobile, full width */}
-        <div className="sm:hidden flex flex-col gap-2 w-full">
-          <Button
-            onClick={() => router.push('/calendar')}
-            size="sm"
-            variant="secondary"
-            className="w-full"
-          >
-            <Calendar size={15} className="mr-1.5" />
-            Calendario
-          </Button>
-          <Button
-            onClick={() => setIsProjectModalOpen(true)}
-            size="sm"
-            variant="secondary"
-            className="w-full"
-          >
-            <Folder size={15} className="mr-1.5" />
-            Nuevo Proyecto
-          </Button>
-          <Button
-            onClick={() => setIsBoardModalOpen(true)}
-            size="sm"
-            className="w-full"
-          >
-            <Plus size={15} className="mr-1.5" />
-            Nuevo Tablero
-          </Button>
-          <Button
-            onClick={() => setIsNoteModalOpen(true)}
-            size="sm"
-            variant="secondary"
-            className="w-full"
-          >
-            <FileText size={15} className="mr-1.5" />
-            Nueva Nota
-          </Button>
-        </div>
+        )}
       </div>
 
-      <CreateBoardModal
-        isOpen={isBoardModalOpen}
-        onClose={() => setIsBoardModalOpen(false)}
-        userId={userId}
-      />
-
       <CreateProjectGroupModal
-        isOpen={isProjectModalOpen}
-        onClose={() => setIsProjectModalOpen(false)}
+        isOpen={projectModal}
+        onClose={() => setProjectModal(false)}
         userId={userId}
       />
-
+      <CreateBoardModal
+        isOpen={boardModal}
+        onClose={() => setBoardModal(false)}
+        userId={userId}
+      />
       <CreateNoteModal
-        isOpen={isNoteModalOpen}
-        onClose={() => setIsNoteModalOpen(false)}
+        isOpen={noteModal}
+        onClose={() => setNoteModal(false)}
         userId={userId}
         ownerEmail={userEmail}
         ownerName={userName}

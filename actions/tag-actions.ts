@@ -16,7 +16,7 @@ export async function getProjectTags(projectId: string): Promise<ApiResponse<ITa
     await connectDB();
 
     // Obtener todas las tareas del proyecto
-    const tasks = await Task.find({ projectId }).select('tags').lean();
+    const tasks = await Task.find({ boardId: projectId }).select('tags').lean();
 
     // Extraer todas las etiquetas y eliminar duplicados
     const allTags: ITag[] = [];

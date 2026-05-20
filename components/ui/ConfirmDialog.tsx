@@ -33,12 +33,12 @@ export default function ConfirmDialog({
       <div className="space-y-5">
         {/* Icono de advertencia */}
         <div className="flex justify-center">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+          <div className={`w-11 h-11 rounded-full flex items-center justify-center ${
             variant === 'danger' ? 'bg-red-50' : 'bg-orange-50'
           }`}>
-            <AlertTriangle 
-              size={32} 
-              className={variant === 'danger' ? 'text-red-500' : 'text-orange-500'} 
+            <AlertTriangle
+              size={20}
+              className={variant === 'danger' ? 'text-red-500' : 'text-orange-500'}
             />
           </div>
         </div>
@@ -46,14 +46,14 @@ export default function ConfirmDialog({
         {/* Mensaje */}
         <div className="text-center">
           {typeof message === 'string' ? (
-            <p className="text-[#7a7a7a]">{message}</p>
+            <p className="text-sm text-[#7a7a7a] leading-relaxed">{message}</p>
           ) : (
             message
           )}
         </div>
 
         {/* Botones */}
-        <div className="flex gap-3 pt-2">
+        <div className="flex gap-2.5 pt-1">
           <Button
             type="button"
             variant="ghost"
@@ -68,8 +68,8 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             isLoading={isLoading}
             className={`flex-1 ${
-              variant === 'danger' 
-                ? 'bg-red-500 hover:bg-red-600' 
+              variant === 'danger'
+                ? 'bg-red-500 hover:bg-red-600'
                 : 'bg-orange-500 hover:bg-orange-600'
             }`}
           >

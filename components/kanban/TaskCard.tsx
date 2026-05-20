@@ -75,6 +75,7 @@ export default function TaskCard({ task, selectionMode = false, isSelected = fal
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onClick={handleClick}
+        title={task.description || undefined}
       >
         {/* Checkbox de selección */}
         {selectionMode && (

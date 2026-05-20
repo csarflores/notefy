@@ -80,7 +80,7 @@ export default function TaskFilters({
           />
           
           {/* Menú de filtros */}
-          <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-[#e0e0e0] py-2 z-50">
+          <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-[#e0e0e0] py-2 z-50">
             {/* Filtros básicos */}
             <div className="px-2">
               <p className="text-[10px] font-semibold text-[#7a7a7a] px-2 mb-1 tracking-[-0.08px]">

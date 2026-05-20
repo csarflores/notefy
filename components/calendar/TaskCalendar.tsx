@@ -193,10 +193,11 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
     const task: ITask = event.resource;
     if (!task) return null;
     const boardColor = (task.boardId as any)?.color || '#6b7280';
+    const isDone = task.status === 'done';
     return (
       <div className="cal-event-pill" title={task.title}>
         <span className="cal-event-dot" style={{ backgroundColor: boardColor }} />
-        <span className="cal-event-title">{task.title}</span>
+        <span className={`cal-event-title${isDone ? ' line-through opacity-60' : ''}`}>{task.title}</span>
       </div>
     );
   }, []);
@@ -209,6 +210,7 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
     const boardName = (task.boardId as any)?.name || 'Sin tablero';
     const rgb = hexToRgb(boardColor);
     const bg = rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},0.08)` : 'rgba(107,114,128,0.08)';
+    const isDone = task.status === 'done';
     return (
       <div
         className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
@@ -216,7 +218,7 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
         title={task.title}
       >
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-medium text-[#1d1d1f] truncate">{task.title}</div>
+          <div className={`text-[13px] font-medium text-[#1d1d1f] truncate${isDone ? ' line-through opacity-60' : ''}`}>{task.title}</div>
           <div className="text-[11px] text-[#7a7a7a] truncate">{boardName}</div>
         </div>
       </div>

@@ -50,7 +50,6 @@ body {
 /* TipTap Code Block Syntax Highlighting */
 .ProseMirror {
   outline: none;
-  min-height: 200px;
 }
 
 .ProseMirror > * {

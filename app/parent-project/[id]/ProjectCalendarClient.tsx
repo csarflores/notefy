@@ -48,10 +48,6 @@ export default function ProjectCalendarClient({ projectId, userId }: ProjectCale
     setSelectedTask(null);
   };
 
-  const handleTaskUpdated = () => {
-    loadTasks();
-  };
-
   const handleEventDrop = async (task: ITask, newDate: Date) => {
     const prevTasks = tasks;
     setTasks(prev =>

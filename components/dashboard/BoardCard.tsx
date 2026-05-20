@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, MoreVertical, Edit2, Trash2, Lock } from 'lucide-react';
+import { Users, MoreHorizontal, Edit2, Trash2, Lock, LayoutGrid, ExternalLink } from 'lucide-react';
 import EditBoardModal from './EditBoardModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { deleteBoard } from '@/actions/board-actions';
 import { IBoard } from '@/types';
 import { formatDate } from '@/lib/utils';
-import { getProjectGradient } from '@/constants/project-colors';
 import { useTabContext } from '@/components/tabs/TabContext';
+import SidebarContextMenu, { ContextMenuItem } from '@/components/layout/SidebarContextMenu';
 
 interface BoardCardProps {
   board: IBoard;
@@ -31,14 +31,13 @@ export default function BoardCard({
   
   const router = useRouter();
   const { openTab } = useTabContext();
-  const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const handleClick = (e: React.MouseEvent) => {
-    if (isDragging) return;
+  const openBoard = () => {
     openTab({
       id: `board-${board._id}`,
       type: 'board',
@@ -48,6 +47,17 @@ export default function BoardCard({
     });
     router.push(`/board/${board._id}`);
   };
+
+  const handleClick = () => {
+    if (isDragging) return;
+    openBoard();
+  };
+
+  const ctxItems: ContextMenuItem[] = [
+    { label: 'Editar', icon: Edit2, onClick: () => setShowEditModal(true) },
+    { label: 'Abrir', icon: ExternalLink, onClick: openBoard },
+    { label: 'Eliminar', icon: Trash2, onClick: () => setShowDeleteDialog(true), variant: 'danger', separator: true },
+  ];
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -72,7 +82,6 @@ export default function BoardCard({
     e.preventDefault();
     
     const draggedBoardId = e.dataTransfer.getData('boardId');
-    const draggedBoardIndex = parseInt(e.dataTransfer.getData('boardIndex'));
     const draggedProjectId = e.dataTransfer.getData('projectId') || null;
     
     // Solo permitir reordenamiento si es del mismo proyecto (o ambos sin proyecto)
@@ -96,10 +105,7 @@ export default function BoardCard({
     }
   };
 
-  const handleEdit = () => {
-    setShowMenu(false);
-    setShowEditModal(true);
-  };
+  const handleEdit = () => setShowEditModal(true);
 
   const members = board.members || [];
 
@@ -108,89 +114,64 @@ export default function BoardCard({
     <div
       draggable
       onClick={handleClick}
+      onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className={`bg-white rounded-lg p-2.5 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group cursor-pointer ${
+      className={`group relative bg-white rounded-xl border border-[#e0e0e0] overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer ${
         isDragging ? 'opacity-50 scale-95' : ''
-      } ${
-        isDragOver ? 'ring-2 ring-blue-400 scale-105' : ''
-      }`}
-      style={{ borderColor: board.color ? board.color : undefined }}
+      } ${isDragOver ? 'ring-2 ring-[#0066cc] ring-offset-1' : ''}`}
     >
-      <div className="flex items-start justify-between mb-1.5">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-[13px] font-semibold text-[#1d1d1f] mb-0.5 tracking-[-0.32px] truncate">
-            {board.name}
-          </h3>
-          {board.description && (
-            <p className="text-[11px] text-[#7a7a7a] line-clamp-1 tracking-[-0.12px]">
-              {board.description}
-            </p>
-          )}
-        </div>
+      {/* Color accent — left border */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
+        style={{ backgroundColor: board.color || '#6b7280' }}
+      />
 
-        <div className="relative shrink-0 ml-1.5">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="p-1 rounded-lg hover:bg-[#f5f5f7] transition-colors"
-          >
-            <MoreVertical size={13} className="text-[#7a7a7a]" />
-          </button>
-
-          {showMenu && (
-            <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-10">
-              <button
-                onClick={handleEdit}
-                className="w-full px-3 py-2 text-left text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2 tracking-[-0.12px]"
-              >
-                <Edit2 size={14} />
-                Editar
-              </button>
-              <button
-                onClick={() => {
-                  setShowMenu(false);
-                  setShowDeleteDialog(true);
-                }}
-                className="w-full px-3 py-2 text-left text-[12px] text-red-500 hover:bg-red-50 flex items-center gap-2 tracking-[-0.12px]"
-              >
-                <Trash2 size={14} />
-                Eliminar
-              </button>
+      <div className="pl-4 pr-3 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ backgroundColor: (board.color || '#6b7280') + '1a' }}
+            >
+              <LayoutGrid size={13} style={{ color: board.color || '#6b7280' }} />
             </div>
+            <div className="min-w-0">
+              <h3 className="text-[14px] font-semibold text-[#1d1d1f] truncate tracking-[-0.2px]">
+                {board.name}
+              </h3>
+              {board.description && (
+                <p className="text-[11px] text-[#7a7a7a] line-clamp-1 mt-0.5">{board.description}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setCtxMenu({ x: rect.left, y: rect.bottom + 4 });
+              }}
+              className="p-1 rounded-md hover:bg-[#f5f5f7] transition-colors opacity-0 group-hover:opacity-100"
+            >
+              <MoreHorizontal size={14} className="text-[#7a7a7a]" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 mt-2 mb-0.5">
+          {members.length > 0 ? (
+            <><Users size={11} className="text-[#a0a0a8]" /><span className="text-[11px] text-[#a0a0a8]">{members.length} {members.length === 1 ? 'miembro' : 'miembros'}</span></>
+          ) : (
+            <><Lock size={11} className="text-[#a0a0a8]" /><span className="text-[11px] text-[#a0a0a8]">Privado</span></>
           )}
         </div>
-      </div>
 
-      {/* Miembros */}
-      {members.length > 0 ? (
-        <div className="flex items-center gap-1 mb-1.5">
-          <Users size={11} className="text-[#7a7a7a]" />
-          <span className="text-[10px] text-[#7a7a7a] tracking-[-0.08px]">
-            {members.length} {members.length === 1 ? 'miembro' : 'miembros'}
-          </span>
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#f0f0f2]">
+          <span className="text-[11px] text-[#a0a0a8]">{formatDate(board.updatedAt)}</span>
         </div>
-      ) : (
-        <div className="flex items-center gap-1 mb-1.5">
-          <Lock size={11} className="text-[#7a7a7a]" />
-          <span className="text-[10px] text-[#7a7a7a] tracking-[-0.08px]">
-            Tablero privado
-          </span>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-1.5 border-t border-[#e0e0e0]">
-        <span className="text-[9px] text-[#7a7a7a] tracking-[-0.08px]">
-          {formatDate(board.updatedAt)}
-        </span>
-        <button
-          onClick={(e) => { e.stopPropagation(); handleClick(e); }}
-          className="text-[11px] font-medium text-[#0066cc] hover:text-[#0071e3] transition-colors tracking-[-0.12px]"
-        >
-          Ver tablero →
-        </button>
       </div>
     </div>
 
@@ -200,6 +181,15 @@ export default function BoardCard({
       onClose={() => setShowEditModal(false)}
       board={board}
     />
+
+    {ctxMenu && (
+      <SidebarContextMenu
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        items={ctxItems}
+        onClose={() => setCtxMenu(null)}
+      />
+    )}
 
     {/* Diálogo de confirmación de eliminación */}
     <ConfirmDialog

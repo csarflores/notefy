@@ -9,18 +9,8 @@ import { getUserNotes } from '@/actions/note-actions';
 import { getUserById } from '@/actions/user-actions';
 import DashboardClient from './DashboardClient';
 import DashboardWithDragDrop from './DashboardWithDragDrop';
-import { Logo } from '@/components/ui/Logotipo';
 import Footer from '@/components/dashboard/Footer';
 import TabSyncer from '@/components/tabs/TabSyncer';
-import TabBar from '@/components/tabs/TabBar';
-
-function DashboardTabHeader() {
-  return (
-    <div className="sticky top-0 z-50 bg-white border-b border-[#e0e0e0] shadow-sm">
-      <TabBar />
-    </div>
-  );
-}
 
 async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; userEmail?: string }) {
   const [projectsResult, boardsResult, notesResult] = await Promise.all([
@@ -65,17 +55,34 @@ async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; us
 
   if (allProjects.length === 0 && allBoards.length === 0 && unassignedNotes.length === 0) {
     return (
-      <div className="text-center py-12 sm:py-16">
-        <div className="max-w-md mx-auto px-4">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 rounded-full bg-[#f5f5f7] flex items-center justify-center">
-            <Plus size={24} className="sm:hidden text-[#7a7a7a]" />
-            <Plus size={32} className="hidden sm:block text-[#7a7a7a]" />
-          </div>
-          <h3 className="text-[17px] sm:text-[21px] font-semibold text-[#1d1d1f] mb-2 tracking-[-0.374px]">
-            No tienes proyectos, tableros ni notas aún
+      <div className="py-12 sm:py-16">
+        <div className="max-w-lg mx-auto px-4">
+          <h3 className="text-[17px] sm:text-[20px] font-semibold text-[#1d1d1f] mb-1 tracking-tight">
+            Bienvenido a Notefy
           </h3>
-          <p className="text-[14px] sm:text-[17px] text-[#7a7a7a] tracking-[-0.224px]">
-            Crea tu primer proyecto, tablero o nota para comenzar a organizar tu trabajo
+          <p className="text-[13px] text-[#7a7a7a] mb-8">
+            Empieza en tres pasos:
+          </p>
+          <ol className="space-y-4">
+            {[
+              { n: 1, title: 'Crea un Proyecto', desc: 'Agrupa tableros y notas bajo un mismo tema o cliente.', hint: 'Usa el botón "+ Nuevo" o el sidebar izquierdo.' },
+              { n: 2, title: 'Agrega un Tablero', desc: 'Organiza tus tareas en columnas: Pendiente, En Progreso, Hecho.', hint: 'Desde el proyecto, usa "+ Nuevo Tablero".' },
+              { n: 3, title: 'Crea tus primeras tareas', desc: 'Asigna responsables, fechas y etiquetas a cada tarea.', hint: 'Dentro del tablero, haz clic en "+" en cada columna.' },
+            ].map((step) => (
+              <li key={step.n} className="flex gap-4 bg-white rounded-xl p-4 border border-[#e0e0e0]">
+                <div className="w-7 h-7 rounded-full bg-[#0066cc] text-white text-[13px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  {step.n}
+                </div>
+                <div>
+                  <p className="text-[14px] font-semibold text-[#1d1d1f]">{step.title}</p>
+                  <p className="text-[12px] text-[#7a7a7a] mt-0.5">{step.desc}</p>
+                  <p className="text-[11px] text-[#a0a0a8] mt-1 italic">{step.hint}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="text-[12px] text-[#a0a0a8] mt-6 text-center">
+            Tip: usa <kbd className="bg-[#f0f0f2] px-1.5 py-0.5 rounded text-[11px] border border-[#e0e0e0]">Ctrl+K</kbd> para buscar y crear desde cualquier pantalla.
           </p>
         </div>
       </div>
@@ -138,31 +145,10 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full flex flex-col">
+    <div className="w-full flex flex-col min-h-full">
       <TabSyncer id="dashboard" type="dashboard" title="Dashboard" url="/dashboard" />
-      <DashboardTabHeader />
       <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
-        {/* Header */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between gap-4">
-            {/* Logo a la izquierda */}
-            <div className="p-2.5 bg-white rounded-xl shadow-sm border border-[#e0e0e0]/50 shrink-0">
-              <Logo className="h-8 w-8" />
-            </div>
-            
-            {/* Título y subtítulo a la derecha */}
-            <div className="text-right flex-1">
-              <h1 className="text-[20px] sm:text-[28px] lg:text-[32px] font-bold text-[#1d1d1f] mb-1 tracking-tight leading-tight">
-                Dashboard
-              </h1>
-              <p className="text-[13px] sm:text-[15px] text-[#6b7280] leading-relaxed">
-                Gestiona tus proyectos y tableros en un solo lugar
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Botón de crear proyecto */}
+        {/* Botones de acción */}
         <DashboardClient userId={session.user.id} userName={session.user.name} userEmail={session.user.email} />
 
         {/* Lista de proyectos y tableros */}
@@ -172,7 +158,7 @@ export default async function DashboardPage() {
           </Suspense>
         </div>
       </div>
-      
+
       <Footer />
     </div>
   );

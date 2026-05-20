@@ -1,6 +1,62 @@
 import mongoose, { Schema, Model } from 'mongoose';
 import { ITask } from '@/types';
 
+const ReplySchema = new Schema(
+  {
+    authorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    authorName: {
+      type: String,
+      required: true,
+    },
+    authorImage: {
+      type: String,
+      default: null,
+    },
+    content: {
+      type: String,
+      required: true,
+      maxlength: [2000, 'La respuesta no puede exceder 2000 caracteres'],
+    },
+  },
+  {
+    timestamps: { createdAt: true, updatedAt: false },
+  }
+);
+
+const CommentSchema = new Schema(
+  {
+    authorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    authorName: {
+      type: String,
+      required: true,
+    },
+    authorImage: {
+      type: String,
+      default: null,
+    },
+    content: {
+      type: String,
+      required: true,
+      maxlength: [2000, 'El comentario no puede exceder 2000 caracteres'],
+    },
+    replies: {
+      type: [ReplySchema],
+      default: [],
+    },
+  },
+  {
+    timestamps: { createdAt: true, updatedAt: false },
+  }
+);
+
 const TagSchema = new Schema(
   {
     text: {
@@ -66,6 +122,10 @@ const TaskSchema = new Schema<ITask>(
     order: {
       type: Number,
       default: 0,
+    },
+    comments: {
+      type: [CommentSchema],
+      default: [],
     },
     dueDate: {
       type: Date,
