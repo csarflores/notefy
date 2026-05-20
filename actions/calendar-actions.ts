@@ -38,7 +38,7 @@ export async function getUserTasksWithDeliveryDate(userId: string): Promise<ApiR
       deliveryDate: { $ne: null }
     })
       .populate('assignedTo', 'name email image')
-      .populate('boardId', 'name projectId color')
+      .populate({ path: 'boardId', select: 'name projectId color', populate: { path: 'projectId', select: 'name color' } })
       .sort({ deliveryDate: 1 })
       .lean();
 
@@ -86,7 +86,7 @@ export async function getProjectTasksWithDeliveryDate(projectId: string, userId:
       deliveryDate: { $ne: null }
     })
       .populate('assignedTo', 'name email image')
-      .populate('boardId', 'name projectId color')
+      .populate({ path: 'boardId', select: 'name projectId color', populate: { path: 'projectId', select: 'name color' } })
       .sort({ deliveryDate: 1 })
       .lean();
 
@@ -139,7 +139,7 @@ export async function getUpcomingTasks(userId: string, days: number = 7): Promis
       status: { $ne: 'done' }
     })
       .populate('assignedTo', 'name email image')
-      .populate('boardId', 'name projectId color')
+      .populate({ path: 'boardId', select: 'name projectId color', populate: { path: 'projectId', select: 'name color' } })
       .sort({ deliveryDate: 1 })
       .lean();
 
@@ -188,7 +188,7 @@ export async function getOverdueTasks(userId: string): Promise<ApiResponse<ITask
       status: { $ne: 'done' }
     })
       .populate('assignedTo', 'name email image')
-      .populate('boardId', 'name projectId color')
+      .populate({ path: 'boardId', select: 'name projectId color', populate: { path: 'projectId', select: 'name color' } })
       .sort({ deliveryDate: 1 })
       .lean();
 

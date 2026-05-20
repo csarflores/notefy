@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import TaskCalendar from '@/components/calendar/TaskCalendar';
 import EditTaskModal from '@/components/kanban/EditTaskModal';
 import { ITask } from '@/types';
-import { getProjectTasksWithDeliveryDate } from '@/actions/calendar-actions';
+import { getProjectTasksWithDeliveryDate, updateTaskDeliveryDate } from '@/actions/calendar-actions';
 
 interface ProjectCalendarClientProps {
   projectId: string;
@@ -52,6 +52,23 @@ export default function ProjectCalendarClient({ projectId, userId }: ProjectCale
     loadTasks();
   };
 
+  const handleEventDrop = async (task: ITask, newDate: Date) => {
+    const prevTasks = tasks;
+    setTasks(prev =>
+      prev.map(t =>
+        t._id.toString() === task._id.toString()
+          ? { ...t, deliveryDate: newDate }
+          : t
+      ) as ITask[]
+    );
+    try {
+      const result = await updateTaskDeliveryDate(task._id.toString(), newDate);
+      if (!result.success) setTasks(prevTasks);
+    } catch {
+      setTasks(prevTasks);
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-xl border border-[#e0e0e0] p-6">
@@ -65,9 +82,11 @@ export default function ProjectCalendarClient({ projectId, userId }: ProjectCale
 
   return (
     <>
-      <TaskCalendar 
+      <TaskCalendar
         tasks={tasks}
         onTaskClick={handleTaskClick}
+        onEventDrop={handleEventDrop}
+        hideProjectFilter
       />
       {selectedTask && (
         <EditTaskModal

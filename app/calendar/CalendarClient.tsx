@@ -27,20 +27,20 @@ export default function CalendarClient({ initialTasks, upcomingTasks, overdueTas
   };
 
   const handleEventDrop = async (task: ITask, newDate: Date) => {
+    const prevTasks = tasks;
+    setTasks(prev =>
+      prev.map(t =>
+        t._id.toString() === task._id.toString()
+          ? { ...t, deliveryDate: newDate }
+          : t
+      ) as ITask[]
+    );
     try {
       const result = await updateTaskDeliveryDate(task._id.toString(), newDate);
-      if (result.success) {
-        // Recargar la página para obtener datos actualizados
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Error al actualizar fecha de entrega:', error);
+      if (!result.success) setTasks(prevTasks);
+    } catch {
+      setTasks(prevTasks);
     }
-  };
-
-  const handleTaskUpdate = () => {
-    // Recargar la página para obtener datos actualizados
-    window.location.reload();
   };
 
   return (

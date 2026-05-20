@@ -11,6 +11,16 @@ import DashboardClient from './DashboardClient';
 import DashboardWithDragDrop from './DashboardWithDragDrop';
 import { Logo } from '@/components/ui/Logotipo';
 import Footer from '@/components/dashboard/Footer';
+import TabSyncer from '@/components/tabs/TabSyncer';
+import TabBar from '@/components/tabs/TabBar';
+
+function DashboardTabHeader() {
+  return (
+    <div className="sticky top-0 z-50 bg-white border-b border-[#e0e0e0] shadow-sm">
+      <TabBar />
+    </div>
+  );
+}
 
 async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; userEmail?: string }) {
   const [projectsResult, boardsResult, notesResult] = await Promise.all([
@@ -129,6 +139,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full flex flex-col">
+      <TabSyncer id="dashboard" type="dashboard" title="Dashboard" url="/dashboard" />
+      <DashboardTabHeader />
       <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
         {/* Header */}
         <div className="mb-12">

@@ -11,6 +11,8 @@ import CalendarClient from "./CalendarClient";
 import { Logo } from "@/components/ui/Logotipo";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import TabSyncer from "@/components/tabs/TabSyncer";
+import TabBar from "@/components/tabs/TabBar";
 
 async function CalendarData({ userId }: { userId: string }) {
   const [tasksResult, upcomingResult, overdueResult] = await Promise.all([
@@ -63,6 +65,10 @@ export default async function CalendarPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full flex flex-col">
+      <TabSyncer id="calendar" type="calendar" title="Calendario" url="/calendar" />
+      <div className="sticky top-0 z-50 bg-white border-b border-[#e0e0e0] shadow-sm">
+        <TabBar />
+      </div>
       <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
         {/* Navegación de regreso */}
         <Link

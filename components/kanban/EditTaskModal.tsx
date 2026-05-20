@@ -40,21 +40,19 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
   // Inicializar con datos de la tarea
   useEffect(() => {
     if (task && isOpen) {
-      const loadKey = `${isOpen}-${task._id}`;
-      if (hasLoadedRef.current !== loadKey) {
-        setTitle(task.title);
-        setDescription(task.description || '');
-        setStatus(task.status);
-        setTags(task.tags || []);
-        setAssignedTo(task.assignedTo.map(id => id.toString()));
-        setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
-        setDeliveryDate(task.deliveryDate ? new Date(task.deliveryDate).toISOString().split('T')[0] : '');
+      setTitle(task.title);
+      setDescription(task.description || '');
+      setStatus(task.status);
+      setTags(task.tags || []);
+      setAssignedTo(task.assignedTo.map((user: any) => user?._id?.toString() ?? user.toString()));
+      setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+      setDeliveryDate(task.deliveryDate ? new Date(task.deliveryDate).toISOString().split('T')[0] : '');
+
+      const boardId = task.boardId?.toString();
+      if (boardId && hasLoadedRef.current !== boardId) {
         loadProjectData();
-        hasLoadedRef.current = loadKey;
+        hasLoadedRef.current = boardId;
       }
-    }
-    if (!isOpen) {
-      hasLoadedRef.current = null;
     }
   }, [task, isOpen]);
 
@@ -68,6 +66,9 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
 
     if (usersResult.success && usersResult.data) {
       setProjectUsers(usersResult.data);
+      if (usersResult.data.length === 1) {
+        setAssignedTo([usersResult.data[0]._id.toString()]);
+      }
     }
 
     if (tagsResult.success && tagsResult.data) {
@@ -266,32 +267,34 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
         </div>
 
         {/* Asignar miembros */}
-        <div>
-          <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
-            Asignar a
-          </label>
-          <div className="flex flex-wrap gap-1.5">
-            {projectUsers.map((user) => (
-              <button
-                key={user._id.toString()}
-                type="button"
-                onClick={() => handleToggleUser(user._id.toString())}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all ${
-                  assignedTo.includes(user._id.toString())
-                    ? 'border-[#0066cc] bg-[#0066cc]/5'
-                    : 'border-[#e0e0e0] hover:border-[#7a7a7a]'
-                }`}
-                disabled={isLoading}
-              >
-                <Avatar src={user.image} name={user.name} size="sm" />
-                <span className="text-[12px] text-[#1d1d1f] tracking-[-0.12px]">{user.name}</span>
-                {assignedTo.includes(user._id.toString()) && (
-                  <Check size={12} className="text-[#0066cc]" />
-                )}
-              </button>
-            ))}
+        {projectUsers.length > 1 && (
+          <div>
+            <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
+              Asignar a
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {projectUsers.map((user) => (
+                <button
+                  key={user._id.toString()}
+                  type="button"
+                  onClick={() => handleToggleUser(user._id.toString())}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all ${
+                    assignedTo.includes(user._id.toString())
+                      ? 'border-[#0066cc] bg-[#0066cc]/5'
+                      : 'border-[#e0e0e0] hover:border-[#7a7a7a]'
+                  }`}
+                  disabled={isLoading}
+                >
+                  <Avatar src={user.image} name={user.name} size="sm" />
+                  <span className="text-[12px] text-[#1d1d1f] tracking-[-0.12px]">{user.name}</span>
+                  {assignedTo.includes(user._id.toString()) && (
+                    <Check size={12} className="text-[#0066cc]" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tags */}
         <div>

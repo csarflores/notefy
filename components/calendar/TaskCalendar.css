@@ -1,0 +1,16 @@
+.rbc-event.rbc-selected,
+.rbc-event:focus {
+  outline: none;
+}
+
+.rbc-addons-dnd .rbc-addons-dnd-drag-preview {
+  opacity: 0.7;
+}
+
+.rbc-addons-dnd-resizable {
+  cursor: grab;
+}
+
+.rbc-addons-dnd-resizable:active {
+  cursor: grabbing;
+}

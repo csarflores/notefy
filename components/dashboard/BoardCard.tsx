@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Users, MoreVertical, Edit2, Trash2, Lock } from 'lucide-react';
 import EditBoardModal from './EditBoardModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -10,6 +9,7 @@ import { deleteBoard } from '@/actions/board-actions';
 import { IBoard } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { getProjectGradient } from '@/constants/project-colors';
+import { useTabContext } from '@/components/tabs/TabContext';
 
 interface BoardCardProps {
   board: IBoard;
@@ -30,6 +30,7 @@ export default function BoardCard({
 }: BoardCardProps) {
   
   const router = useRouter();
+  const { openTab } = useTabContext();
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -37,8 +38,14 @@ export default function BoardCard({
   const [isDragging, setIsDragging] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
-    // No hacer click si estamos arrastrando
     if (isDragging) return;
+    openTab({
+      id: `board-${board._id}`,
+      type: 'board',
+      title: board.name,
+      url: `/board/${board._id}`,
+      resourceId: board._id.toString(),
+    });
     router.push(`/board/${board._id}`);
   };
 
@@ -100,11 +107,12 @@ export default function BoardCard({
     <>
     <div
       draggable
+      onClick={handleClick}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className={`bg-white rounded-lg p-2.5 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group cursor-move ${
+      className={`bg-white rounded-lg p-2.5 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group cursor-pointer ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${
         isDragOver ? 'ring-2 ring-blue-400 scale-105' : ''
@@ -177,12 +185,12 @@ export default function BoardCard({
         <span className="text-[9px] text-[#7a7a7a] tracking-[-0.08px]">
           {formatDate(board.updatedAt)}
         </span>
-        <Link
-          href={`/board/${board._id}`}
+        <button
+          onClick={(e) => { e.stopPropagation(); handleClick(e); }}
           className="text-[11px] font-medium text-[#0066cc] hover:text-[#0071e3] transition-colors tracking-[-0.12px]"
         >
           Ver tablero →
-        </Link>
+        </button>
       </div>
     </div>
 

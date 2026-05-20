@@ -17,6 +17,8 @@ import {
 import Link from "next/link";
 import ProjectNotesClient from "./ProjectNotesClient";
 import ProjectCalendarClient from "./ProjectCalendarClient";
+import TabSyncer from "@/components/tabs/TabSyncer";
+import TabBar from "@/components/tabs/TabBar";
 
 async function BoardsList({
   projectId,
@@ -168,6 +170,16 @@ export default async function ProjectPage({
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] overflow-x-hidden w-full">
+      <TabSyncer
+        id={`project-${id}`}
+        type="project"
+        title={project.name}
+        url={`/parent-project/${id}`}
+        resourceId={id}
+      />
+      <div className="sticky top-0 z-50 bg-white border-b border-[#e0e0e0] shadow-sm">
+        <TabBar />
+      </div>
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6">
         {/* Navegación de regreso */}
         <Link

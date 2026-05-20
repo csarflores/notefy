@@ -1,11 +1,11 @@
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
+import TabSyncer from '@/components/tabs/TabSyncer';
 import { getBoardById } from '@/actions/board-actions';
 import { getBoardTasks } from '@/actions/task-actions';
 import { getBoardUsers } from '@/actions/board-actions';
 import { getProjectById } from '@/actions/project-actions';
 import BoardClient from './BoardClient';
-import BoardWithFilters from './BoardWithFilters';
 import { isValidObjectId } from '@/lib/utils';
 import connectDB from '@/lib/mongodb';
 import Board from '@/models/Board';
@@ -81,11 +81,16 @@ async function BoardContent({ boardId }: { boardId: string }) {
 
   return (
     <>
-      <BoardClient board={board} />
-
-      <BoardWithFilters
+      <TabSyncer
+        id={`board-${boardId}`}
+        type="board"
+        title={board.name}
+        url={`/board/${boardId}`}
+        resourceId={boardId}
+      />
+      <BoardClient
+        board={board}
         tasks={tasks}
-        boardId={boardId}
         boardUsers={users}
         boardTags={board.tags || []}
       />

@@ -117,23 +117,21 @@ export async function getBoardUsers(
     }
 
     const User = (await import('@/models/User')).default;
-    
-    const owner = await User.findById(board.owner).select('_id name email image').lean();
-    
-    if (!owner) {
-      return { success: false, error: 'Propietario no encontrado' };
-    }
 
-    const members = await User.find({
-      email: { $in: board.members }
+    const allUsers = await User.find({
+      $or: [
+        { _id: board.owner },
+        { email: { $in: board.members } },
+      ]
     }).select('_id name email image').lean();
 
-    const allUsers = [owner, ...members];
-
-    // Filtrar usuarios duplicados por _id
-    const uniqueUsers = allUsers.filter((user, index, self) =>
-      index === self.findIndex((u) => u._id.toString() === user._id.toString())
-    );
+    const seen = new Set<string>();
+    const uniqueUsers = allUsers.filter((u) => {
+      const id = u._id.toString();
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
 
     return { success: true, data: JSON.parse(JSON.stringify(uniqueUsers)) };
   } catch (error) {

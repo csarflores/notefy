@@ -3,8 +3,17 @@
 import { useState } from 'react';
 import { Filter, X } from 'lucide-react';
 
+export interface FilterOption {
+  id: string;
+  name: string;
+}
+
 interface CalendarFiltersProps {
   onFilterChange: (filters: CalendarFilters) => void;
+  projects?: FilterOption[];
+  boards?: FilterOption[];
+  users?: FilterOption[];
+  hideProjectFilter?: boolean;
 }
 
 export interface CalendarFilters {
@@ -14,7 +23,7 @@ export interface CalendarFilters {
   assignedTo?: string | 'all';
 }
 
-export default function CalendarFilters({ onFilterChange }: CalendarFiltersProps) {
+export default function CalendarFilters({ onFilterChange, projects = [], boards = [], users = [], hideProjectFilter = false }: CalendarFiltersProps) {
   const [filters, setFilters] = useState<CalendarFilters>({
     status: 'all',
     projectId: 'all',
@@ -76,7 +85,6 @@ export default function CalendarFilters({ onFilterChange }: CalendarFiltersProps
           </div>
 
           <div className="space-y-3">
-            {/* Estado */}
             <div>
               <label className="block text-xs font-medium text-[#7a7a7a] mb-1">
                 Estado
@@ -93,22 +101,24 @@ export default function CalendarFilters({ onFilterChange }: CalendarFiltersProps
               </select>
             </div>
 
-            {/* Proyecto - Placeholder para cuando se implemente */}
-            <div>
-              <label className="block text-xs font-medium text-[#7a7a7a] mb-1">
-                Proyecto
-              </label>
-              <select
-                value={filters.projectId}
-                onChange={(e) => handleFilterChange('projectId', e.target.value)}
-                className="w-full px-2 py-1.5 rounded-lg border border-[#e0e0e0] text-xs text-[#1d1d1f] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none"
-              >
-                <option value="all">Todos los proyectos</option>
-                {/* Se llenará dinámicamente */}
-              </select>
-            </div>
+            {!hideProjectFilter && (
+              <div>
+                <label className="block text-xs font-medium text-[#7a7a7a] mb-1">
+                  Proyecto
+                </label>
+                <select
+                  value={filters.projectId}
+                  onChange={(e) => handleFilterChange('projectId', e.target.value)}
+                  className="w-full px-2 py-1.5 rounded-lg border border-[#e0e0e0] text-xs text-[#1d1d1f] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none"
+                >
+                  <option value="all">Todos los proyectos</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            {/* Tablero - Placeholder para cuando se implemente */}
             <div>
               <label className="block text-xs font-medium text-[#7a7a7a] mb-1">
                 Tablero
@@ -119,11 +129,12 @@ export default function CalendarFilters({ onFilterChange }: CalendarFiltersProps
                 className="w-full px-2 py-1.5 rounded-lg border border-[#e0e0e0] text-xs text-[#1d1d1f] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none"
               >
                 <option value="all">Todos los tableros</option>
-                {/* Se llenará dinámicamente */}
+                {boards.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
               </select>
             </div>
 
-            {/* Asignado a - Placeholder para cuando se implemente */}
             <div>
               <label className="block text-xs font-medium text-[#7a7a7a] mb-1">
                 Asignado a
@@ -134,7 +145,9 @@ export default function CalendarFilters({ onFilterChange }: CalendarFiltersProps
                 className="w-full px-2 py-1.5 rounded-lg border border-[#e0e0e0] text-xs text-[#1d1d1f] focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/20 outline-none"
               >
                 <option value="all">Todos</option>
-                {/* Se llenará dinámicamente */}
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
               </select>
             </div>
           </div>

@@ -44,14 +44,9 @@ export default function CreateTaskModal({
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (isOpen && projectId) {
-      if (hasLoadedRef.current !== `${isOpen}-${projectId}`) {
-        loadProjectData();
-        hasLoadedRef.current = `${isOpen}-${projectId}`;
-      }
-    }
-    if (!isOpen) {
-      hasLoadedRef.current = null;
+    if (isOpen && projectId && hasLoadedRef.current !== projectId) {
+      loadProjectData();
+      hasLoadedRef.current = projectId;
     }
   }, [isOpen, projectId]);
 
@@ -69,6 +64,9 @@ export default function CreateTaskModal({
 
     if (usersResult.success && usersResult.data) {
       setBoardUsers(usersResult.data);
+      if (usersResult.data.length === 1) {
+        setAssignedTo([usersResult.data[0]._id.toString()]);
+      }
     }
 
     if (tagsResult.success && tagsResult.data) {
@@ -281,32 +279,34 @@ export default function CreateTaskModal({
         </div>
 
         {/* Asignar miembros */}
-        <div>
-          <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
-            Asignar a
-          </label>
-          <div className="flex flex-wrap gap-1.5">
-            {boardUsers.map((user) => (
-              <button
-                key={user._id.toString()}
-                type="button"
-                onClick={() => handleToggleUser(user._id.toString())}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all ${
-                  assignedTo.includes(user._id.toString())
-                    ? 'border-[#0066cc] bg-[#0066cc]/5'
-                    : 'border-[#e0e0e0] hover:border-[#7a7a7a]'
-                }`}
-                disabled={isLoading}
-              >
-                <Avatar src={user.image} name={user.name} size="sm" />
-                <span className="text-[12px] text-[#1d1d1f] tracking-[-0.12px]">{user.name}</span>
-                {assignedTo.includes(user._id.toString()) && (
-                  <Check size={12} className="text-[#0066cc]" />
-                )}
-              </button>
-            ))}
+        {boardUsers.length > 1 && (
+          <div>
+            <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1 tracking-[-0.224px]">
+              Asignar a
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {boardUsers.map((user) => (
+                <button
+                  key={user._id.toString()}
+                  type="button"
+                  onClick={() => handleToggleUser(user._id.toString())}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all ${
+                    assignedTo.includes(user._id.toString())
+                      ? 'border-[#0066cc] bg-[#0066cc]/5'
+                      : 'border-[#e0e0e0] hover:border-[#7a7a7a]'
+                  }`}
+                  disabled={isLoading}
+                >
+                  <Avatar src={user.image} name={user.name} size="sm" />
+                  <span className="text-[12px] text-[#1d1d1f] tracking-[-0.12px]">{user.name}</span>
+                  {assignedTo.includes(user._id.toString()) && (
+                    <Check size={12} className="text-[#0066cc]" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tags */}
         <div>

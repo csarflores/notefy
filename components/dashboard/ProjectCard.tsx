@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Folder, MoreVertical, Edit2, Trash2, ChevronRight } from 'lucide-react';
 import EditProjectModal from './EditProjectModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -10,6 +9,7 @@ import { deleteProject } from '@/actions/project-actions';
 import { IProject } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { getProjectGradient } from '@/constants/project-colors';
+import { useTabContext } from '@/components/tabs/TabContext';
 
 interface ProjectCardProps {
   project: IProject;
@@ -19,6 +19,7 @@ interface ProjectCardProps {
 
 export default function ProjectCard({ project, boardCount, onBoardDrop }: ProjectCardProps) {
   const router = useRouter();
+  const { openTab } = useTabContext();
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -139,13 +140,22 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
           </span>
         </div>
 
-        <Link
-          href={`/project/${project._id}`}
+        <button
+          onClick={() => {
+            openTab({
+              id: `project-${project._id}`,
+              type: 'project',
+              title: project.name,
+              url: `/parent-project/${project._id}`,
+              resourceId: project._id.toString(),
+            });
+            router.push(`/parent-project/${project._id}`);
+          }}
           className="flex items-center gap-1 text-[11px] font-medium text-white hover:text-white/80 transition-colors tracking-[-0.12px]"
         >
           Ver tableros
           <ChevronRight size={12} />
-        </Link>
+        </button>
       </div>
     </div>
 
