@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2, LayoutGrid, Calendar } from 'lucide-react';
+import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2, LayoutGrid, Calendar, Tags } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import CreateTaskModal from '@/components/kanban/CreateTaskModal';
 import EditTaskModal from '@/components/kanban/EditTaskModal';
 import EditBoardModal from '@/components/dashboard/EditBoardModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import TagManagerModal from '@/components/kanban/TagManagerModal';
 import BoardWithFilters from './BoardWithFilters';
 import TaskCalendar from '@/components/calendar/TaskCalendar';
 import { deleteBoard } from '@/actions/board-actions';
@@ -31,6 +32,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingTask, setEditingTask] = useState<ITask | null>(null);
+  const [showTagManager, setShowTagManager] = useState(false);
 
   const handleDeleteBoard = async () => {
     setIsDeleting(true);
@@ -138,6 +140,13 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
                       <Edit2 size={13} className="text-[#7a7a7a]" />
                       Editar tablero
                     </button>
+                    <button
+                      onClick={() => { setShowBoardMenu(false); setShowTagManager(true); }}
+                      className="w-full px-3 py-2 text-left text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2.5 rounded-lg transition-colors"
+                    >
+                      <Tags size={13} className="text-[#7a7a7a]" />
+                      Administrar etiquetas
+                    </button>
                   </div>
                   <div className="h-px bg-[#f0f0f0] mx-1" />
                   <div className="p-1">
@@ -196,6 +205,14 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
         board={board}
+      />
+
+      {/* Modal de administrar etiquetas */}
+      <TagManagerModal
+        isOpen={showTagManager}
+        onClose={() => setShowTagManager(false)}
+        boardId={board._id.toString()}
+        initialTags={boardTags}
       />
 
       {/* Diálogo de confirmación de eliminación */}
