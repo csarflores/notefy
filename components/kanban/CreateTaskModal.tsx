@@ -8,7 +8,7 @@ import Avatar from '@/components/ui/Avatar';
 import NoteEditor from '@/components/notes/NoteEditor';
 import { createTask } from '@/actions/task-actions';
 import { getBoardUsers } from '@/actions/board-actions';
-import { getProjectTags } from '@/actions/tag-actions';
+import { getBoardTags } from '@/actions/tag-actions';
 import { ITag, IUser } from '@/types';
 import { X, Plus, Check } from 'lucide-react';
 import { generateRandomColor } from '@/lib/utils';
@@ -77,7 +77,7 @@ export default function CreateTaskModal({
   const loadProjectData = async () => {
     const [usersResult, tagsResult] = await Promise.all([
       getBoardUsers(projectId),
-      getProjectTags(projectId),
+      getBoardTags(projectId),
     ]);
 
     if (usersResult.success && usersResult.data) {

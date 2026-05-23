@@ -9,7 +9,7 @@ import Avatar from '@/components/ui/Avatar';
 import NoteEditor from '@/components/notes/NoteEditor';
 import { updateTask, addComment, deleteComment, addReply, deleteReply } from '@/actions/task-actions';
 import { getBoardUsers } from '@/actions/board-actions';
-import { getProjectTags } from '@/actions/tag-actions';
+import { getBoardTags } from '@/actions/tag-actions';
 import { IComment, IReply, ITag, ITask, IUser } from '@/types';
 import { X, Plus, Check, Save, Send, Trash2, MessageSquare, LayoutList, CornerDownRight } from 'lucide-react';
 import { generateRandomColor } from '@/lib/utils';
@@ -82,10 +82,18 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
   const hasLoadedRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (isOpen) setActiveTab('details');
   }, [isOpen]);
+
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, [title]);
 
   useEffect(() => {
     if (task && isOpen) {
@@ -106,7 +114,10 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
           : ''
       );
 
-      const boardId = task.boardId?.toString();
+      const boardIdObj = task.boardId as any;
+      const boardId = typeof boardIdObj === 'object' && boardIdObj !== null
+        ? (boardIdObj._id?.toString() ?? boardIdObj.toString())
+        : boardIdObj?.toString();
       if (boardId && hasLoadedRef.current !== boardId) {
         loadProjectData();
         hasLoadedRef.current = boardId;
@@ -123,9 +134,14 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
 
   const loadProjectData = async () => {
     if (!task?.boardId) return;
+    const boardIdObj = task.boardId as any;
+    const boardId = typeof boardIdObj === 'object' && boardIdObj !== null
+      ? (boardIdObj._id?.toString() ?? boardIdObj.toString())
+      : boardIdObj?.toString();
+    if (!boardId) return;
     const [usersResult, tagsResult] = await Promise.all([
-      getBoardUsers(task.boardId.toString()),
-      getProjectTags(task.boardId.toString()),
+      getBoardUsers(boardId),
+      getBoardTags(boardId),
     ]);
 
     if (usersResult.success && usersResult.data) {
@@ -269,16 +285,17 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
       headerContent={
         <div>
           {/* Fila título + acciones */}
-          <div className="flex items-center gap-3 px-6 pt-4 pb-3">
-            <input
-              type="text"
+          <div className="flex items-start gap-3 px-6 pt-4 pb-3">
+            <textarea
+              ref={titleRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight border-none outline-none bg-transparent w-full placeholder:text-[#c7c7cc] placeholder:font-normal"
+              rows={1}
+              className="text-[15px] font-semibold text-[#1d1d1f] tracking-tight border-none outline-none bg-transparent w-full placeholder:text-[#c7c7cc] placeholder:font-normal resize-none overflow-hidden leading-snug"
               placeholder="Nombre de la tarea..."
               disabled={isLoading}
             />
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex items-center gap-2.5 shrink-0 pt-0.5">
               {activeTab === 'details' && (
                 <button
                   type="button"
