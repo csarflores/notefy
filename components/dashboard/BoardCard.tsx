@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Users, MoreHorizontal, Edit2, Trash2, Lock, LayoutGrid, ExternalLink } from 'lucide-react';
 import EditBoardModal from './EditBoardModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -30,7 +31,9 @@ export default function BoardCard({
 }: BoardCardProps) {
   
   const router = useRouter();
+  const { data: session } = useSession();
   const { openTab } = useTabContext();
+  const isBoardOwner = board.owner?.toString() === session?.user?.id;
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -56,7 +59,7 @@ export default function BoardCard({
   const ctxItems: ContextMenuItem[] = [
     { label: 'Editar', icon: Edit2, onClick: () => setShowEditModal(true) },
     { label: 'Abrir', icon: ExternalLink, onClick: openBoard },
-    { label: 'Eliminar', icon: Trash2, onClick: () => setShowDeleteDialog(true), variant: 'danger', separator: true },
+    ...(isBoardOwner ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setShowDeleteDialog(true), variant: 'danger' as const, separator: true }] : []),
   ];
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -104,8 +107,6 @@ export default function BoardCard({
       setIsDeleting(false);
     }
   };
-
-  const handleEdit = () => setShowEditModal(true);
 
   const members = board.members || [];
 
@@ -200,7 +201,7 @@ export default function BoardCard({
       message={
         <div className="space-y-2">
           <p className="text-[#7a7a7a]">
-            ¿Estás seguro de que deseas eliminar el tablero <strong>"{board.name}"</strong>?
+            ¿Estás seguro de que deseas eliminar el tablero <strong>&quot;{board.name}&quot;</strong>?
           </p>
           <p className="text-sm text-red-500">
             Esta acción eliminará permanentemente el tablero y todas sus tareas.

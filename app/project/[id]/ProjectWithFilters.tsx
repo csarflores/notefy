@@ -53,9 +53,9 @@ export default function ProjectWithFilters({
     if (currentFilter === 'my-tasks' && session?.user?.id) {
       return tasks.filter(task => {
         // assignedTo puede ser array de objetos de usuario o IDs
-        return task.assignedTo.some((user: any) => {
+        return (task.assignedTo as unknown as ({ _id?: { toString(): string } } | string)[]).some((user) => {
           // Si es un objeto, acceder a _id, si es string, usar directamente
-          const userId = typeof user === 'object' && user !== null 
+          const userId = typeof user === 'object' && user !== null
             ? (user._id?.toString() || String(user))
             : String(user);
           return userId === session.user.id;
@@ -77,15 +77,15 @@ export default function ProjectWithFilters({
 
     // Filtrar por usuario específico
     return tasks.filter(task => {
-      return task.assignedTo.some((user: any) => {
+      return (task.assignedTo as unknown as ({ _id?: { toString(): string } } | string)[]).some((user) => {
         // Si es un objeto, acceder a _id, si es string, usar directamente
-        const userId = typeof user === 'object' && user !== null 
+        const userId = typeof user === 'object' && user !== null
           ? (user._id?.toString() || String(user))
           : String(user);
         return userId === currentFilter;
       });
     });
-  }, [tasks, currentFilter, session?.user?.id, projectTags]);
+  }, [tasks, currentFilter, session?.user?.id, allTags]);
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">

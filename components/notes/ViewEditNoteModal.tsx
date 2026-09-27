@@ -55,7 +55,7 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
       } else {
         showNotification(result.error || 'Error al guardar la nota', 'error');
       }
-    } catch (error) {
+    } catch {
       showNotification('Error al guardar la nota', 'error');
     } finally {
       setIsSaving(false);
@@ -76,7 +76,7 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
         } else {
           showNotification(result.error || 'Error al compartir la nota', 'error');
         }
-      } catch (error) {
+      } catch {
         showNotification('Error al compartir la nota', 'error');
       } finally {
         setIsSharing(false);
@@ -104,7 +104,7 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
       } else {
         showNotification(result.error || 'Error al eliminar el miembro', 'error');
       }
-    } catch (error) {
+    } catch {
       showNotification('Error al eliminar el miembro', 'error');
     } finally {
       setIsSharing(false);
@@ -126,7 +126,7 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
       } else {
         showNotification(result.error || 'Error al eliminar la nota', 'error');
       }
-    } catch (error) {
+    } catch {
       showNotification('Error al eliminar la nota', 'error');
     } finally {
       setIsDeleting(false);
@@ -316,6 +316,8 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
               onChange={setContent}
               editable={true}
               placeholder="Escribe el contenido de tu nota..."
+              uploadScope="note-image"
+              uploadResourceId={note._id.toString()}
             />
           </div>
         </div>

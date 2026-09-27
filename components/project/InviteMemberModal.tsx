@@ -52,7 +52,7 @@ export default function InviteMemberModal({ isOpen, onClose, project }: InviteMe
       } else {
         setError(result.error || 'Error al agregar miembro');
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al agregar miembro');
     } finally {
       setIsLoading(false);

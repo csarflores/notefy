@@ -5,32 +5,37 @@ import Task from '@/models/Task';
 import Board from '@/models/Board';
 import { ApiResponse, ITask } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
+import {
+  getAuthUser,
+  isSelf,
+  findAccessibleProject,
+  findAccessibleTask,
+  AuthUser,
+} from '@/lib/auth-helpers';
+
+// Obtiene los IDs de tableros donde el usuario es owner o member
+async function getAccessibleBoardIds(user: AuthUser) {
+  const boards = await Board.find({
+    $or: [
+      { owner: user.id },
+      { members: user.email }
+    ]
+  }).select('_id').lean();
+
+  return boards.map(board => board._id);
+}
 
 // Obtener todas las tareas del usuario con deliveryDate
 export async function getUserTasksWithDeliveryDate(userId: string): Promise<ApiResponse<ITask[]>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     await connectDB();
 
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
-
-    // Obtener tableros donde el usuario es owner o member
-    const boards = await Board.find({
-      $or: [
-        { owner: userId },
-        { members: user.email }
-      ]
-    }).select('_id').lean();
-
-    const boardIds = boards.map(board => board._id);
+    const boardIds = await getAccessibleBoardIds(user);
 
     // Obtener tareas con deliveryDate de esos tableros
     const tasks = await Task.find({
@@ -56,18 +61,17 @@ export async function getProjectTasksWithDeliveryDate(projectId: string, userId:
       return { success: false, error: 'ID de proyecto inválido' };
     }
 
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+
+    const project = await findAccessibleProject(projectId, user);
+    if (!project) {
+      return { success: false, error: 'Proyecto no encontrado o sin permisos' };
     }
 
     await connectDB();
-
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
 
     // Obtener tableros del proyecto donde el usuario tiene acceso
     const boards = await Board.find({
@@ -100,33 +104,19 @@ export async function getProjectTasksWithDeliveryDate(projectId: string, userId:
 // Obtener tareas próximas a vencer (dentro de los próximos 7 días)
 export async function getUpcomingTasks(userId: string, days: number = 7): Promise<ApiResponse<ITask[]>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     await connectDB();
-
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
 
     // Calcular fecha límite
     const currentDate = new Date();
     const futureDate = new Date();
     futureDate.setDate(currentDate.getDate() + days);
 
-    // Obtener tableros donde el usuario es owner o member
-    const boards = await Board.find({
-      $or: [
-        { owner: userId },
-        { members: user.email }
-      ]
-    }).select('_id').lean();
-
-    const boardIds = boards.map(board => board._id);
+    const boardIds = await getAccessibleBoardIds(user);
 
     // Obtener tareas con deliveryDate en el rango especificado
     const tasks = await Task.find({
@@ -153,30 +143,16 @@ export async function getUpcomingTasks(userId: string, days: number = 7): Promis
 // Obtener tareas vencidas (deliveryDate pasado y no completadas)
 export async function getOverdueTasks(userId: string): Promise<ApiResponse<ITask[]>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     await connectDB();
 
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
-
     const currentDate = new Date();
 
-    // Obtener tableros donde el usuario es owner o member
-    const boards = await Board.find({
-      $or: [
-        { owner: userId },
-        { members: user.email }
-      ]
-    }).select('_id').lean();
-
-    const boardIds = boards.map(board => board._id);
+    const boardIds = await getAccessibleBoardIds(user);
 
     // Obtener tareas vencidas
     const tasks = await Task.find({
@@ -202,16 +178,14 @@ export async function getOverdueTasks(userId: string): Promise<ApiResponse<ITask
 // Actualizar deliveryDate de una tarea (para drag-and-drop)
 export async function updateTaskDeliveryDate(taskId: string, deliveryDate: Date): Promise<ApiResponse<ITask>> {
   try {
-    if (!isValidObjectId(taskId)) {
-      return { success: false, error: 'ID de tarea inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const task = await Task.findById(taskId);
-
+    const task = await findAccessibleTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
 
     task.deliveryDate = deliveryDate;

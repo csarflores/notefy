@@ -173,7 +173,7 @@ export default function ProjectClient({ project }: ProjectClientProps) {
         message={
           <div className="space-y-2">
             <p className="text-[#7a7a7a]">
-              ¿Estás seguro de que deseas eliminar el proyecto <strong>"{project.name}"</strong>?
+              ¿Estás seguro de que deseas eliminar el proyecto <strong>&quot;{project.name}&quot;</strong>?
             </p>
             <p className="text-sm text-red-500">
               Esta acción eliminará permanentemente el proyecto y todas sus tareas. No se puede deshacer.

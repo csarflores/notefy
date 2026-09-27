@@ -101,9 +101,13 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
     if (!confirmDelete) return;
     setDeleting(true);
     try {
-      if (confirmDelete.type === 'project') await deleteProject(confirmDelete.id);
-      else if (confirmDelete.type === 'board') await deleteBoard(confirmDelete.id);
-      else if (confirmDelete.type === 'note') await deleteNote(confirmDelete.id, userId);
+      let result;
+      if (confirmDelete.type === 'project') result = await deleteProject(confirmDelete.id);
+      else if (confirmDelete.type === 'board') result = await deleteBoard(confirmDelete.id);
+      else if (confirmDelete.type === 'note') result = await deleteNote(confirmDelete.id, userId);
+      if (result && !result.success) {
+        window.alert(result.error || 'No se pudo eliminar');
+      }
       await loadData();
     } finally {
       setDeleting(false);
@@ -191,9 +195,9 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
           </Link>
         </div>
         <div className="mt-auto flex flex-col items-center pb-3 gap-1">
-          <div className="p-2 rounded-full bg-[#f0f0f2]" title={userName}>
+          <Link href="/settings" className="p-2 rounded-full bg-[#f0f0f2] hover:bg-[#e5e5ea] transition-colors" title={userName}>
             <User size={14} className="text-[#5c5c5e]" />
-          </div>
+          </Link>
         </div>
       </div>
     );
@@ -320,7 +324,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                         { label: 'Editar', icon: Pencil, onClick: () => setEditProject(project) },
                         { label: 'Nuevo tablero', icon: Plus, onClick: () => { setBoardModalProjectId(projectId); setBoardModal(true); } },
                         { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(projectUrl, { id: `project-${projectId}`, type: 'project', title: project.name, url: projectUrl, resourceId: projectId }) },
-                        { label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'project', id: projectId, title: project.name }), variant: 'danger', separator: true },
+                        ...(project.owner.toString() === userId ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'project', id: projectId, title: project.name }), variant: 'danger' as const, separator: true }] : []),
                       ])}
                       className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors cursor-pointer select-none ${
                         isActive(projectUrl)
@@ -377,7 +381,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                               onContextMenu={(e) => openContextMenu(e, [
                                 { label: 'Editar', icon: Pencil, onClick: () => setEditBoard(board) },
                                 { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(boardUrl, boardTab) },
-                                { label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'board', id: board._id.toString(), title: board.name }), variant: 'danger', separator: true },
+                                ...(board.owner.toString() === userId ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'board', id: board._id.toString(), title: board.name }), variant: 'danger' as const, separator: true }] : []),
                               ])}
                               className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[12px] transition-colors text-left ${
                                 isActive(boardUrl)
@@ -426,7 +430,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                         onContextMenu={(e) => openContextMenu(e, [
                           { label: 'Editar', icon: Pencil, onClick: () => setEditBoard(board) },
                           { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(boardUrl, boardTab) },
-                          { label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'board', id: board._id.toString(), title: board.name }), variant: 'danger', separator: true },
+                          ...(board.owner.toString() === userId ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'board', id: board._id.toString(), title: board.name }), variant: 'danger' as const, separator: true }] : []),
                         ])}
                         className={linkClass(boardUrl) + ' w-full text-left'}
                       >
@@ -476,7 +480,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                     onContextMenu={(e) => openContextMenu(e, [
                       { label: 'Editar', icon: Pencil, onClick: () => navigate(noteUrl, noteTab) },
                       { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(noteUrl, noteTab) },
-                      { label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'note', id: note._id.toString(), title: note.title }), variant: 'danger', separator: true },
+                      ...(note.owner.toString() === userId ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'note', id: note._id.toString(), title: note.title }), variant: 'danger' as const, separator: true }] : []),
                     ])}
                     className={linkClass(noteUrl) + ' w-full text-left'}
                   >
@@ -497,21 +501,25 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
           )}
         </div>
 
-        {/* Bottom: User + logout */}
+        {/* Bottom: User + settings + logout */}
         <div className="border-t border-[#f0f0f2] px-3 py-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-[#0066cc] flex items-center justify-center shrink-0">
+          <Link
+            href="/settings"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#f0f0f2] transition-colors mb-1"
+            title="Mi cuenta"
+          >
+            <span className="w-6 h-6 rounded-full bg-[#0066cc] flex items-center justify-center shrink-0">
               <span className="text-[10px] font-bold text-white uppercase">
                 {userName?.charAt(0) || 'U'}
               </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-medium text-[#1d1d1f] truncate">{userName}</p>
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[12px] font-medium text-[#1d1d1f] truncate">{userName}</span>
               {userEmail && (
-                <p className="text-[10px] text-[#7a7a7a] truncate">{userEmail}</p>
+                <span className="block text-[10px] text-[#7a7a7a] truncate">{userEmail}</span>
               )}
-            </div>
-          </div>
+            </span>
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: '/auth/login' })}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-[#7a7a7a] hover:bg-[#f0f0f2] hover:text-[#1d1d1f] transition-colors"

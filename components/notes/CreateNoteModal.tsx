@@ -36,7 +36,6 @@ export default function CreateNoteModal({
   const [memberEmail, setMemberEmail] = useState('');
   const [members, setMembers] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const handleSave = async () => {
@@ -77,7 +76,7 @@ export default function CreateNoteModal({
       } else {
         showNotification(result.error || 'Error al crear la nota', 'error');
       }
-    } catch (error) {
+    } catch {
       showNotification('Error al crear la nota', 'error');
     } finally {
       setIsSaving(false);
@@ -244,8 +243,6 @@ export default function CreateNoteModal({
                           />
                           <Button
                             onClick={addMember}
-                            disabled={isSharing}
-                            isLoading={isSharing}
                             size="sm"
                           >
                             Agregar

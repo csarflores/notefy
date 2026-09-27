@@ -47,12 +47,9 @@ const ProjectSchema = new Schema<IProject>(
 
 // Índice para búsquedas por propietario
 ProjectSchema.index({ owner: 1 });
+ProjectSchema.index({ members: 1 });
 
-// Eliminar el modelo existente si existe para forzar recarga con nuevo schema
-if (mongoose.models.Project) {
-  delete mongoose.models.Project;
-}
-
-const Project: Model<IProject> = mongoose.model<IProject>('Project', ProjectSchema);
+const Project: Model<IProject> =
+  mongoose.models.Project || mongoose.model<IProject>('Project', ProjectSchema);
 
 export default Project;

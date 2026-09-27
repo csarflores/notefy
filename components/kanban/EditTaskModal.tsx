@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useRef } from 'react';
+import { useState, FormEvent, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import Image from 'next/image';
 import Modal from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
@@ -10,8 +11,10 @@ import NoteEditor from '@/components/notes/NoteEditor';
 import { updateTask, addComment, deleteComment, addReply, deleteReply } from '@/actions/task-actions';
 import { getBoardUsers } from '@/actions/board-actions';
 import { getBoardTags } from '@/actions/tag-actions';
-import { IComment, IReply, ITag, ITask, IUser } from '@/types';
-import { X, Plus, Check, Save, Send, Trash2, MessageSquare, LayoutList, CornerDownRight } from 'lucide-react';
+import { setTaskCover, clearTaskCover, addTaskAttachment, removeTaskAttachment } from '@/actions/upload-actions';
+import { useUpload } from '@/hooks/useUpload';
+import { IComment, IReply, ITag, ITask, ITaskAttachment, IUser } from '@/types';
+import { X, Plus, Check, Save, Send, Trash2, MessageSquare, LayoutList, CornerDownRight, ImagePlus, Paperclip } from 'lucide-react';
 import { generateRandomColor } from '@/lib/utils';
 
 function formatCommentDate(date: Date | string): string {
@@ -57,6 +60,13 @@ const STATUS_OPTIONS = [
 
 type ActiveTab = 'details' | 'comments';
 
+// boardId puede venir poblado (documento) o como ObjectId
+function getTaskBoardId(boardId: ITask['boardId']): string | undefined {
+  const ref = boardId as unknown as { _id?: { toString(): string }; toString(): string } | null | undefined;
+  if (!ref) return undefined;
+  return ref._id?.toString() ?? ref.toString();
+}
+
 export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -79,13 +89,23 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [isAddingReply, setIsAddingReply] = useState(false);
+  const [coverUrl, setCoverUrl] = useState('');
+  const [attachments, setAttachments] = useState<ITaskAttachment[]>([]);
   const hasLoadedRef = useRef<string | null>(null);
+  const loadedTaskIdRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const { upload, progress, isUploading } = useUpload();
 
   useEffect(() => {
-    if (isOpen) setActiveTab('details');
+    if (isOpen) {
+      setActiveTab('details');
+    } else {
+      loadedTaskIdRef.current = null;
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -95,49 +115,8 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
     el.style.height = el.scrollHeight + 'px';
   }, [title]);
 
-  useEffect(() => {
-    if (task && isOpen) {
-      setTitle(task.title);
-      setDescription(task.description || '');
-      setStatus(task.status);
-      setTags(task.tags || []);
-      setComments((task.comments as any[]) || []);
-      setAssignedTo(
-        task.assignedTo.map((user: any) => user?._id?.toString() ?? user.toString())
-      );
-      setDueDate(
-        task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
-      );
-      setDeliveryDate(
-        task.deliveryDate
-          ? new Date(task.deliveryDate).toISOString().split('T')[0]
-          : ''
-      );
-
-      const boardIdObj = task.boardId as any;
-      const boardId = typeof boardIdObj === 'object' && boardIdObj !== null
-        ? (boardIdObj._id?.toString() ?? boardIdObj.toString())
-        : boardIdObj?.toString();
-      if (boardId && hasLoadedRef.current !== boardId) {
-        loadProjectData();
-        hasLoadedRef.current = boardId;
-      }
-    }
-  }, [task, isOpen]);
-
-  // Scroll al último comentario cuando se agrega uno nuevo
-  useEffect(() => {
-    if (activeTab === 'comments') {
-      commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [comments, activeTab]);
-
-  const loadProjectData = async () => {
-    if (!task?.boardId) return;
-    const boardIdObj = task.boardId as any;
-    const boardId = typeof boardIdObj === 'object' && boardIdObj !== null
-      ? (boardIdObj._id?.toString() ?? boardIdObj.toString())
-      : boardIdObj?.toString();
+  const loadProjectData = useCallback(async () => {
+    const boardId = getTaskBoardId(task?.boardId);
     if (!boardId) return;
     const [usersResult, tagsResult] = await Promise.all([
       getBoardUsers(boardId),
@@ -153,7 +132,51 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
     if (tagsResult.success && tagsResult.data) {
       setProjectTags(tagsResult.data);
     }
-  };
+  }, [task?.boardId]);
+
+  useEffect(() => {
+    if (!task || !isOpen) return;
+
+    // Solo poblar el formulario al abrir otra tarea: si el prop `task` cambia
+    // mientras se edita (p. ej. una server action con revalidatePath), no pisar
+    // las ediciones del usuario.
+    const taskId = task._id.toString();
+    if (loadedTaskIdRef.current !== taskId) {
+      loadedTaskIdRef.current = taskId;
+      setTitle(task.title);
+      setDescription(task.description || '');
+      setStatus(task.status);
+      setTags(task.tags || []);
+      setComments(task.comments || []);
+      setAssignedTo(
+        (task.assignedTo as unknown as { _id?: { toString(): string }; toString(): string }[])
+          .map((user) => user._id?.toString() ?? user.toString())
+      );
+      setCoverUrl(task.imageUrl || '');
+      setAttachments(task.attachments || []);
+      setDueDate(
+        task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+      );
+      setDeliveryDate(
+        task.deliveryDate
+          ? new Date(task.deliveryDate).toISOString().split('T')[0]
+          : ''
+      );
+    }
+
+    const boardId = getTaskBoardId(task.boardId);
+    if (boardId && hasLoadedRef.current !== boardId) {
+      loadProjectData();
+      hasLoadedRef.current = boardId;
+    }
+  }, [task, isOpen, loadProjectData]);
+
+  // Scroll al último comentario cuando se agrega uno nuevo
+  useEffect(() => {
+    if (activeTab === 'comments') {
+      commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [comments, activeTab]);
 
   const handleAddTag = () => {
     if (!newTagText.trim() || tags.length >= 5) return;
@@ -180,6 +203,79 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
       setAssignedTo(assignedTo.filter((id) => id !== userId));
     } else {
       setAssignedTo([...assignedTo, userId]);
+    }
+  };
+
+  const handleCoverSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !task) return;
+    setError('');
+
+    const result = await upload(file, {
+      scope: 'task-cover',
+      resourceId: task._id.toString(),
+    });
+    if ('error' in result) {
+      setError(result.error);
+      return;
+    }
+
+    const saved = await setTaskCover(task._id.toString(), result.key);
+    if (saved.success && saved.data) {
+      setCoverUrl(saved.data);
+      router.refresh();
+    } else {
+      setError(saved.error || 'Error al guardar la portada');
+    }
+  };
+
+  const handleRemoveCover = async () => {
+    setError('');
+    const result = await clearTaskCover(task._id.toString());
+    if (result.success) {
+      setCoverUrl('');
+      router.refresh();
+    } else {
+      setError(result.error || 'Error al quitar la portada');
+    }
+  };
+
+  const handleAttachmentSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !task) return;
+    setError('');
+
+    const result = await upload(file, {
+      scope: 'task-attachment',
+      resourceId: task._id.toString(),
+    });
+    if ('error' in result) {
+      setError(result.error);
+      return;
+    }
+
+    const saved = await addTaskAttachment(task._id.toString(), {
+      key: result.key,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+    if (saved.success && saved.data) {
+      setAttachments((prev) => [...prev, saved.data as ITaskAttachment]);
+    } else {
+      setError(saved.error || 'Error al agregar el adjunto');
+    }
+  };
+
+  const handleRemoveAttachment = async (attachmentId: string) => {
+    setError('');
+    const result = await removeTaskAttachment(task._id.toString(), attachmentId);
+    if (result.success) {
+      setAttachments((prev) => prev.filter((a) => a._id.toString() !== attachmentId));
+    } else {
+      setError(result.error || 'Error al eliminar el adjunto');
     }
   };
 
@@ -235,7 +331,7 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
   const handleDeleteComment = async (commentId: string) => {
     const result = await deleteComment(task._id.toString(), commentId);
     if (result.success) {
-      setComments((prev) => prev.filter((c: any) => c._id?.toString() !== commentId));
+      setComments((prev) => prev.filter((c: IComment) => c._id?.toString() !== commentId));
     }
   };
 
@@ -245,7 +341,7 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
     const result = await addReply(task._id.toString(), commentId, replyContent);
     if (result.success && result.data) {
       setComments((prev) =>
-        prev.map((c: any) =>
+        prev.map((c: IComment) =>
           c._id?.toString() === commentId
             ? { ...c, replies: [...(c.replies || []), result.data as IReply] }
             : c
@@ -261,9 +357,9 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
     const result = await deleteReply(task._id.toString(), commentId, replyId);
     if (result.success) {
       setComments((prev) =>
-        prev.map((c: any) =>
+        prev.map((c: IComment) =>
           c._id?.toString() === commentId
-            ? { ...c, replies: (c.replies || []).filter((r: any) => r._id?.toString() !== replyId) }
+            ? { ...c, replies: (c.replies || []).filter((r: IReply) => r._id?.toString() !== replyId) }
             : c
         )
       );
@@ -361,6 +457,58 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
       {/* Pestaña Detalles */}
       {activeTab === 'details' && (
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+
+          {/* Portada */}
+          <div>
+            <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-2">
+              Portada
+            </p>
+            {coverUrl ? (
+              <div className="relative rounded-lg overflow-hidden border border-[#e5e5ea] group/cover h-32">
+                <Image src={coverUrl} alt="Portada de la tarea" fill sizes="600px" className="object-cover" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="px-3 py-1.5 rounded-lg bg-white text-[12px] font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors disabled:opacity-50"
+                  >
+                    {isUploading ? `Subiendo ${progress}%` : 'Cambiar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCover}
+                    disabled={isUploading}
+                    className="px-3 py-1.5 rounded-lg bg-white/90 text-[12px] font-medium text-red-500 hover:bg-white transition-colors disabled:opacity-50"
+                  >
+                    Quitar
+                  </button>
+                </div>
+                {isUploading && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
+                    <div className="h-full bg-white transition-all" style={{ width: `${progress}%` }} />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed border-[#e5e5ea] text-[12px] text-[#8e8e93] hover:border-[#0066cc] hover:text-[#0066cc] transition-all disabled:opacity-50"
+              >
+                <ImagePlus size={14} />
+                {isUploading ? `Subiendo ${progress}%` : 'Agregar imagen de portada'}
+              </button>
+            )}
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleCoverSelect}
+            />
+          </div>
 
           {/* Estado */}
           <div>
@@ -536,8 +684,66 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
                 maxLength={50000}
                 showCharCount={true}
                 minHeight="120px"
+                uploadScope="task-image"
+                uploadResourceId={task._id.toString()}
               />
             </div>
+          </div>
+
+          {/* Adjuntos */}
+          <div>
+            <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-2">
+              Adjuntos {attachments.length > 0 && `(${attachments.length}/20)`}
+            </p>
+            {attachments.length > 0 && (
+              <ul className="space-y-1.5 mb-2">
+                {attachments.map((a) => (
+                  <li
+                    key={a._id.toString()}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-[#e5e5ea] group"
+                  >
+                    <Paperclip size={12} className="text-[#8e8e93] shrink-0" />
+                    <a
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-[12px] text-[#1d1d1f] truncate hover:text-[#0066cc]"
+                    >
+                      {a.name}
+                    </a>
+                    <span className="text-[10px] text-[#a0a0a8] shrink-0">
+                      {a.size >= 1048576
+                        ? `${(a.size / 1048576).toFixed(1)} MB`
+                        : `${Math.max(1, Math.round(a.size / 1024))} KB`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(a._id.toString())}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-[#a0a0a8] hover:text-red-500 transition-all"
+                      title="Eliminar adjunto"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              onClick={() => attachmentInputRef.current?.click()}
+              disabled={isUploading || isLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-[#e5e5ea] text-[12px] text-[#8e8e93] hover:border-[#0066cc] hover:text-[#0066cc] transition-all disabled:opacity-50"
+            >
+              <Paperclip size={13} />
+              {isUploading ? `Subiendo ${progress}%` : 'Adjuntar archivo'}
+            </button>
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+              className="hidden"
+              onChange={handleAttachmentSelect}
+            />
           </div>
 
           {/* Error */}
@@ -561,11 +767,11 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
                 <p className="text-[12px] text-[#c7c7cc] mt-0.5">Escribí el primero abajo</p>
               </div>
             ) : (
-              (comments as any[]).map((comment: any) => {
+              comments.map((comment: IComment) => {
                 const commentId = comment._id?.toString();
                 const isOwnComment = session?.user?.id && comment.authorId?.toString() === session.user.id;
                 const isReplying = replyingToId === commentId;
-                const replies: any[] = comment.replies || [];
+                const replies: IReply[] = comment.replies || [];
 
                 return (
                   <div key={commentId} className="group">
@@ -610,7 +816,7 @@ export default function EditTaskModal({ isOpen, onClose, task }: EditTaskModalPr
                     {/* Respuestas */}
                     {(replies.length > 0 || isReplying) && (
                       <div className="ml-9 mt-2 pl-3 border-l-2 border-[#f0f0f0] space-y-3">
-                        {replies.map((reply: any) => {
+                        {replies.map((reply: IReply) => {
                           const replyId = reply._id?.toString();
                           const isOwnReply = session?.user?.id && reply.authorId?.toString() === session.user.id;
                           return (

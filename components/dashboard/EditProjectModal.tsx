@@ -58,7 +58,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
       } else {
         setError(result.error || 'Error al actualizar el proyecto');
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al actualizar el proyecto');
     } finally {
       setIsLoading(false);

@@ -7,6 +7,8 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   image?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +56,18 @@ export interface IReply {
   createdAt: Date;
 }
 
+// Tipos para Attachment (archivo adjunto embebido en Task)
+export interface ITaskAttachment {
+  _id: Types.ObjectId;
+  key: string;
+  url: string;
+  name: string;
+  size: number;
+  type: string;
+  uploadedBy: Types.ObjectId;
+  createdAt: Date;
+}
+
 // Tipos para Comment (subdocumento embebido en Task)
 export interface IComment {
   _id: Types.ObjectId;
@@ -72,8 +86,10 @@ export interface ITask extends Document {
   description?: string;
   status: 'todo' | 'in-progress' | 'done';
   boardId: Types.ObjectId;
+  createdBy?: Types.ObjectId | null;
   assignedTo: Types.ObjectId[];
   imageUrl?: string;
+  attachments?: ITaskAttachment[];
   tags: ITag[];
   comments: IComment[];
   order: number;
@@ -135,6 +151,7 @@ export type CreateTaskInput = {
   status?: 'todo' | 'in-progress' | 'done';
   assignedTo?: string[];
   tags?: ITag[];
+  imageUrl?: string;
   dueDate?: string | null;
   deliveryDate?: string | null;
 };

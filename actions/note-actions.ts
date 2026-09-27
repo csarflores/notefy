@@ -5,22 +5,23 @@ import connectDB from '@/lib/mongodb';
 import Note from '@/models/Note';
 import { CreateNoteInput, UpdateNoteInput, ApiResponse, INote } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
+import { deleteS3Prefix, S3_KEY_PREFIX } from '@/lib/s3';
+import {
+  getAuthUser,
+  isSelf,
+  isOwner,
+  findAccessibleProject,
+} from '@/lib/auth-helpers';
 
 // Obtener todas las notas del usuario (incluyendo notas compartidas con él)
 export async function getUserNotes(userId: string): Promise<ApiResponse<INote[]>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     await connectDB();
-
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
 
     // Buscar notas donde el usuario es owner O está en members (notas compartidas)
     const notes = await Note.find({
@@ -46,29 +47,18 @@ export async function getProjectNotes(projectId: string, userId: string): Promis
       return { success: false, error: 'ID de proyecto inválido' };
     }
 
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
-    }
-
-    await connectDB();
-
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
-
-    // Obtener el proyecto para verificar si el usuario es miembro
-    const Project = (await import('@/models/Project')).default;
-    const project = await Project.findById(projectId).lean();
-
-    if (!project) {
-      return { success: false, error: 'Proyecto no encontrado' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     // Verificar si el usuario es miembro del proyecto (owner o en members)
-    const isProjectMember = project.owner.toString() === userId || project.members.includes(user.email);
+    const project = await findAccessibleProject(projectId, user);
+    if (!project) {
+      return { success: false, error: 'Proyecto no encontrado o sin permisos' };
+    }
+
+    await connectDB();
 
     // Buscar notas del proyecto donde:
     // - El usuario es owner (incluye notas privadas)
@@ -90,8 +80,8 @@ export async function getProjectNotes(projectId: string, userId: string): Promis
       if (note.visibility === 'private') {
         return note.owner.toString() === userId;
       }
-      // Notas shared: visibles para todos los miembros del proyecto
-      return isProjectMember;
+      // Notas shared: visibles para todos los miembros del proyecto (ya verificado)
+      return true;
     });
 
     return { success: true, data: JSON.parse(JSON.stringify(filteredNotes)) };
@@ -108,14 +98,12 @@ export async function getNoteById(noteId: string, userId: string): Promise<ApiRe
       return { success: false, error: 'ID de nota inválido' };
     }
 
-    await connectDB();
-
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
+
+    await connectDB();
 
     const note = await Note.findById(noteId);
 
@@ -123,11 +111,15 @@ export async function getNoteById(noteId: string, userId: string): Promise<ApiRe
       return { success: false, error: 'Nota no encontrada' };
     }
 
-    // Verificar permisos: owner o member (si es shared)
-    const isOwner = note.owner.toString() === userId;
+    // Verificar permisos: owner, member (si es shared) o nota shared dentro de un proyecto accesible
+    const isNoteOwner = isOwner(note, user);
     const isMember = note.visibility === 'shared' && note.members.includes(user.email);
+    let hasProjectAccess = false;
+    if (!isNoteOwner && !isMember && note.visibility === 'shared' && note.projectId) {
+      hasProjectAccess = !!(await findAccessibleProject(note.projectId.toString(), user));
+    }
 
-    if (!isOwner && !isMember) {
+    if (!isNoteOwner && !isMember && !hasProjectAccess) {
       return { success: false, error: 'No tienes permiso para ver esta nota' };
     }
 
@@ -145,8 +137,9 @@ export async function createNote(
   data: CreateNoteInput
 ): Promise<ApiResponse<INote>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     if (!data.title || data.title.trim().length === 0) {
@@ -157,16 +150,15 @@ export async function createNote(
       return { success: false, error: 'ID de proyecto inválido' };
     }
 
-    await connectDB();
-
-    // Si la nota está en un proyecto, verificar que el proyecto existe
+    // Si la nota está en un proyecto, verificar que el proyecto existe y el usuario tiene acceso
     if (data.projectId) {
-      const Project = (await import('@/models/Project')).default;
-      const project = await Project.findById(data.projectId);
+      const project = await findAccessibleProject(data.projectId, user);
       if (!project) {
-        return { success: false, error: 'Proyecto no encontrado' };
+        return { success: false, error: 'Proyecto no encontrado o sin permisos' };
       }
     }
+
+    await connectDB();
 
     const newNote = await Note.create({
       title: data.title.trim(),
@@ -201,14 +193,12 @@ export async function updateNote(
       return { success: false, error: 'ID de nota inválido' };
     }
 
-    await connectDB();
-
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
+
+    await connectDB();
 
     const note = await Note.findById(noteId);
 
@@ -217,24 +207,31 @@ export async function updateNote(
     }
 
     // Verificar permisos: owner o member (si es shared)
-    const isOwner = note.owner.toString() === userId;
+    const isNoteOwner = isOwner(note, user);
     const isMember = note.visibility === 'shared' && note.members.includes(user.email);
 
-    if (!isOwner && !isMember) {
+    if (!isNoteOwner && !isMember) {
       return { success: false, error: 'No tienes permiso para editar esta nota' };
     }
 
-    const updateData: any = {};
+    const updateData: UpdateNoteInput = {};
     if (data.title !== undefined) updateData.title = data.title.trim();
     if (data.content !== undefined) updateData.content = data.content;
     if (data.visibility !== undefined) updateData.visibility = data.visibility;
     if (data.color !== undefined) updateData.color = data.color;
-    if (data.members !== undefined) updateData.members = data.members;
     if (data.projectId !== undefined) {
       if (data.projectId && !isValidObjectId(data.projectId)) {
         return { success: false, error: 'ID de proyecto inválido' };
       }
+      if (data.projectId && !(await findAccessibleProject(data.projectId, user))) {
+        return { success: false, error: 'Proyecto no encontrado o sin permisos' };
+      }
       updateData.projectId = data.projectId;
+    }
+
+    // Solo el owner puede cambiar la lista de miembros
+    if (data.members !== undefined && isNoteOwner) {
+      updateData.members = data.members;
     }
 
     const updatedNote = await Note.findByIdAndUpdate(
@@ -267,6 +264,11 @@ export async function deleteNote(noteId: string, userId: string): Promise<ApiRes
       return { success: false, error: 'ID de nota inválido' };
     }
 
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+
     await connectDB();
 
     const note = await Note.findById(noteId);
@@ -276,11 +278,12 @@ export async function deleteNote(noteId: string, userId: string): Promise<ApiRes
     }
 
     // Solo el owner puede eliminar
-    if (note.owner.toString() !== userId) {
+    if (!isOwner(note, user)) {
       return { success: false, error: 'Solo el propietario puede eliminar la nota' };
     }
 
     await Note.findByIdAndDelete(noteId);
+    await deleteS3Prefix(`${S3_KEY_PREFIX}/notas/${noteId}/`);
 
     revalidatePath('/dashboard');
     revalidatePath(`/notes/${noteId}`);
@@ -306,6 +309,11 @@ export async function shareNote(
       return { success: false, error: 'ID de nota inválido' };
     }
 
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       return { success: false, error: 'Email inválido' };
     }
@@ -319,7 +327,7 @@ export async function shareNote(
     }
 
     // Solo el owner puede compartir
-    if (note.owner.toString() !== userId) {
+    if (!isOwner(note, user)) {
       return { success: false, error: 'Solo el propietario puede compartir la nota' };
     }
 
@@ -359,6 +367,11 @@ export async function removeNoteMember(
       return { success: false, error: 'ID de nota inválido' };
     }
 
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+
     await connectDB();
 
     const note = await Note.findById(noteId);
@@ -368,17 +381,17 @@ export async function removeNoteMember(
     }
 
     // Solo el owner puede remover miembros
-    if (note.owner.toString() !== userId) {
+    if (!isOwner(note, user)) {
       return { success: false, error: 'Solo el propietario puede remover miembros' };
     }
 
     note.members = note.members.filter((member) => member !== email);
-    
+
     // Si no hay miembros, volver a private
     if (note.members.length === 0) {
       note.visibility = 'private';
     }
-    
+
     await note.save();
 
     revalidatePath('/dashboard');

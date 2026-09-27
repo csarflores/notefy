@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useRef } from 'react';
+import { useState, FormEvent, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Modal from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
 import NoteEditor from '@/components/notes/NoteEditor';
 import { createTask } from '@/actions/task-actions';
+import { setTaskCover } from '@/actions/upload-actions';
 import { getBoardUsers } from '@/actions/board-actions';
 import { getBoardTags } from '@/actions/tag-actions';
+import { useUpload } from '@/hooks/useUpload';
 import { ITag, IUser } from '@/types';
-import { X, Plus, Check } from 'lucide-react';
+import { X, Plus, Check, ImagePlus } from 'lucide-react';
 import { generateRandomColor } from '@/lib/utils';
 
 interface CreateTaskModalProps {
@@ -60,21 +63,14 @@ export default function CreateTaskModal({
   const [deliveryDate, setDeliveryDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState('');
   const hasLoadedRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const { upload, isUploading } = useUpload();
 
-  useEffect(() => {
-    if (isOpen && projectId && hasLoadedRef.current !== projectId) {
-      loadProjectData();
-      hasLoadedRef.current = projectId;
-    }
-  }, [isOpen, projectId]);
-
-  useEffect(() => {
-    if (isOpen) setStatus(defaultStatus);
-  }, [isOpen, defaultStatus]);
-
-  const loadProjectData = async () => {
+  const loadProjectData = useCallback(async () => {
     const [usersResult, tagsResult] = await Promise.all([
       getBoardUsers(projectId),
       getBoardTags(projectId),
@@ -89,7 +85,18 @@ export default function CreateTaskModal({
     if (tagsResult.success && tagsResult.data) {
       setProjectTags(tagsResult.data);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (isOpen && projectId && hasLoadedRef.current !== projectId) {
+      loadProjectData();
+      hasLoadedRef.current = projectId;
+    }
+  }, [isOpen, projectId, loadProjectData]);
+
+  useEffect(() => {
+    if (isOpen) setStatus(defaultStatus);
+  }, [isOpen, defaultStatus]);
 
   const handleAddTag = () => {
     if (!newTagText.trim() || tags.length >= 5) return;
@@ -145,7 +152,17 @@ export default function CreateTaskModal({
         deliveryDate: deliveryDate || null,
       });
 
-      if (result.success) {
+      if (result.success && result.data) {
+        if (coverFile) {
+          const uploaded = await upload(coverFile, {
+            scope: 'task-cover',
+            resourceId: result.data._id.toString(),
+          });
+          if (!('error' in uploaded)) {
+            await setTaskCover(result.data._id.toString(), uploaded.key);
+          }
+        }
+
         setTitle('');
         setDescription('');
         setTags([]);
@@ -153,6 +170,8 @@ export default function CreateTaskModal({
         setDueDate('');
         setDeliveryDate('');
         setStatus('todo');
+        setCoverFile(null);
+        setCoverPreview('');
         onClose();
         router.refresh();
       } else {
@@ -165,6 +184,18 @@ export default function CreateTaskModal({
     }
   };
 
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('La portada debe ser una imagen');
+      return;
+    }
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
   const handleClose = () => {
     if (!isLoading) {
       setTitle('');
@@ -174,6 +205,8 @@ export default function CreateTaskModal({
       setDueDate('');
       setDeliveryDate('');
       setStatus('todo');
+      setCoverFile(null);
+      setCoverPreview('');
       setError('');
       onClose();
     }
@@ -203,7 +236,7 @@ export default function CreateTaskModal({
               disabled={isLoading || !title.trim()}
               className="px-4 py-1.5 rounded-lg bg-[#0066cc] text-white text-[13px] font-medium hover:bg-[#0055aa] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
-              {isLoading ? 'Creando…' : 'Crear'}
+              {isUploading ? 'Subiendo imagen…' : isLoading ? 'Creando…' : 'Crear'}
             </button>
             <button
               onClick={handleClose}
@@ -217,6 +250,42 @@ export default function CreateTaskModal({
       }
     >
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+
+        {/* Portada */}
+        <div>
+          <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-2">
+            Portada <span className="normal-case font-normal text-[#c7c7cc]">(opcional)</span>
+          </p>
+          {coverPreview ? (
+            <div className="relative rounded-lg overflow-hidden border border-[#e5e5ea] h-28">
+              <Image src={coverPreview} alt="Vista previa de portada" fill sizes="600px" unoptimized className="object-cover" />
+              <button
+                type="button"
+                onClick={() => { setCoverFile(null); setCoverPreview(''); }}
+                className="absolute top-2 right-2 p-1 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => coverInputRef.current?.click()}
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-[#e5e5ea] text-[12px] text-[#8e8e93] hover:border-[#0066cc] hover:text-[#0066cc] transition-all disabled:opacity-50"
+            >
+              <ImagePlus size={14} />
+              Agregar imagen de portada
+            </button>
+          )}
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={handleCoverSelect}
+          />
+        </div>
 
         {/* Estado */}
         <div>

@@ -124,7 +124,7 @@ export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onD
           title="Eliminar nota"
           message={
             <div className="space-y-2">
-              <p className="text-[#7a7a7a]">¿Eliminar la nota <strong>"{note.title}"</strong>?</p>
+              <p className="text-[#7a7a7a]">¿Eliminar la nota <strong>&quot;{note.title}&quot;</strong>?</p>
               <p className="text-sm text-red-500">Esta acción no se puede deshacer.</p>
             </div>
           }

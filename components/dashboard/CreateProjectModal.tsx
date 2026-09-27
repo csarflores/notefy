@@ -44,7 +44,7 @@ export default function CreateProjectModal({ isOpen, onClose, userId }: CreatePr
       } else {
         setError(result.error || 'Error al crear el proyecto');
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al crear el proyecto');
     } finally {
       setIsLoading(false);

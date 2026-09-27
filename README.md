@@ -118,9 +118,6 @@ npm install
 cp .env.example .env.local
 # Editar .env.local con tus credenciales
 
-# Ejecutar migraciones (si es necesario)
-npm run migrate
-
 # Iniciar servidor de desarrollo
 npm run dev
 ```

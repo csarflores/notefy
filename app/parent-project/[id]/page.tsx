@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getProjectById, getProjectUsers } from "@/actions/project-actions";
 import { getProjectBoards } from "@/actions/board-actions";
 import { getProjectNotes } from "@/actions/note-actions";
-import { getUserById } from "@/actions/user-actions";
+import { getUsersByIds } from "@/actions/user-actions";
 import BoardsListClient from "./BoardsListClient";
 import ParentProjectClient from "./ParentProjectClient";
 import {
@@ -63,11 +63,9 @@ async function BoardsList({
 async function NotesList({
   projectId,
   userId,
-  userEmail,
 }: {
   projectId: string;
   userId: string;
-  userEmail?: string;
 }) {
   const result = await getProjectNotes(projectId, userId);
 
@@ -89,24 +87,21 @@ async function NotesList({
     );
   }
 
-  // Obtener información del owner de cada nota
-  const notesWithOwnerInfo = await Promise.all(
-    notes.map(async (note) => {
-      const ownerResult = await getUserById(note.owner.toString());
-      if (ownerResult.success && ownerResult.data) {
-        return {
-          note,
-          ownerEmail: ownerResult.data.email || "",
-          ownerName: ownerResult.data.name || "",
-        };
-      }
-      return {
-        note,
-        ownerEmail: "",
-        ownerName: "",
-      };
-    }),
+  // Obtener información del owner de cada nota (una sola consulta)
+  const ownerIds = [...new Set(notes.map((note) => note.owner.toString()))];
+  const ownersResult = await getUsersByIds(ownerIds);
+  const ownersById = new Map(
+    (ownersResult.data || []).map((owner) => [owner._id.toString(), owner])
   );
+
+  const notesWithOwnerInfo = notes.map((note) => {
+    const owner = ownersById.get(note.owner.toString());
+    return {
+      note,
+      ownerEmail: owner?.email || "",
+      ownerName: owner?.name || "",
+    };
+  });
 
   return <ProjectNotesClient notes={notesWithOwnerInfo} userId={userId} />;
 }
@@ -158,10 +153,6 @@ export default async function ProjectPage({
 
   const usersResult = await getProjectUsers(id);
   const users = usersResult.success && usersResult.data ? usersResult.data : [];
-
-  const boardsResult = await getProjectBoards(id, session.user.id);
-  const boards =
-    boardsResult.success && boardsResult.data ? boardsResult.data : [];
 
   const isOwner = project.owner.toString() === session.user.id;
 
@@ -256,7 +247,6 @@ export default async function ProjectPage({
             <NotesList
               projectId={id}
               userId={session.user.id}
-              userEmail={session.user.email}
             />
           </Suspense>
         </div>

@@ -1,72 +1,20 @@
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import TabSyncer from '@/components/tabs/TabSyncer';
 import { getBoardById } from '@/actions/board-actions';
 import { getBoardTasks } from '@/actions/task-actions';
 import { getBoardUsers } from '@/actions/board-actions';
-import { getProjectById } from '@/actions/project-actions';
 import BoardClient from './BoardClient';
-import { isValidObjectId } from '@/lib/utils';
-import connectDB from '@/lib/mongodb';
-import Board from '@/models/Board';
-import Task from '@/models/Task';
 
 interface BoardPageProps {
   params: Promise<{ id: string }>;
 }
 
 async function BoardContent({ boardId }: { boardId: string }) {
-  // Try to get the board first
-  let boardResult = await getBoardById(boardId);
-
-  // If board doesn't exist, try to convert from project
-  if (!boardResult.success || !boardResult.data) {
-    const projectResult = await getProjectById(boardId);
-
-    if (projectResult.success && projectResult.data) {
-      // Convert project to board directly
-      try {
-        if (isValidObjectId(boardId)) {
-          await connectDB();
-
-          const project = projectResult.data;
-
-          // Check if board already exists
-          const existingBoard = await Board.findById(boardId);
-          if (!existingBoard) {
-            // Create a new Board with the Project data
-            const board = new Board({
-              _id: project._id,
-              name: project.name,
-              description: project.description || '',
-              owner: project.owner,
-              members: project.members || [],
-              tags: [],
-              projectId: null,
-            });
-
-            await board.save();
-
-            // Migrate tasks associated with this project
-            const tasks = await Task.find({ projectId: project._id });
-            if (tasks.length > 0) {
-              await Task.updateMany(
-                { projectId: project._id },
-                { boardId: project._id }
-              );
-            }
-          }
-
-          // Try to get the board again
-          boardResult = await getBoardById(boardId);
-        }
-      } catch (error) {
-        console.error('Error converting project to board:', error);
-      }
-    }
-  }
-
-  const [tasksResult, usersResult] = await Promise.all([
+  const [boardResult, tasksResult, usersResult] = await Promise.all([
+    getBoardById(boardId),
     getBoardTasks(boardId),
     getBoardUsers(boardId),
   ]);
@@ -148,9 +96,14 @@ function BoardLoading() {
 
 export default async function BoardPage({ params }: BoardPageProps) {
   const { id } = await params;
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user) {
+    redirect('/auth/login');
+  }
 
   return (
-    <div className="w-full min-h-full overflow-x-hidden w-full">
+    <div className="w-full min-h-full overflow-x-hidden">
       <Suspense fallback={<BoardLoading />}>
         <BoardContent boardId={id} />
       </Suspense>

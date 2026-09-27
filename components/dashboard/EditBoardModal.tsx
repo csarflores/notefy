@@ -6,7 +6,7 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { updateBoard } from '@/actions/board-actions';
 import { getUserProjects } from '@/actions/project-actions';
-import { IBoard } from '@/types';
+import { IBoard, IProject } from '@/types';
 import { useSession } from 'next-auth/react';
 import { Save, X, Palette } from 'lucide-react';
 import { PROJECT_COLORS } from '@/constants/project-colors';
@@ -24,7 +24,7 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#6b7280');
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [availableProjects, setAvailableProjects] = useState<any[]>([]);
+  const [availableProjects, setAvailableProjects] = useState<IProject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [error, setError] = useState('');
@@ -85,7 +85,7 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
       } else {
         setError(result.error || 'Error al actualizar el tablero');
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al actualizar el tablero');
     } finally {
       setIsLoading(false);

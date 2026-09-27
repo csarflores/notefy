@@ -1,5 +1,5 @@
 import mongoose, { Schema, Model } from 'mongoose';
-import { ITask } from '@/types';
+import { ITask, ITag } from '@/types';
 
 const ReplySchema = new Schema(
   {
@@ -57,6 +57,40 @@ const CommentSchema = new Schema(
   }
 );
 
+const AttachmentSchema = new Schema(
+  {
+    key: {
+      type: String,
+      required: true,
+    },
+    url: {
+      type: String,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      maxlength: [200, 'El nombre del archivo no puede exceder 200 caracteres'],
+    },
+    size: {
+      type: Number,
+      required: true,
+    },
+    type: {
+      type: String,
+      required: true,
+    },
+    uploadedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+  },
+  {
+    timestamps: { createdAt: true, updatedAt: false },
+  }
+);
+
 const TagSchema = new Schema(
   {
     text: {
@@ -100,6 +134,11 @@ const TaskSchema = new Schema<ITask>(
       ref: 'Board',
       required: [true, 'El tablero es requerido'],
     },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     assignedTo: {
       type: [Schema.Types.ObjectId],
       ref: 'User',
@@ -109,11 +148,21 @@ const TaskSchema = new Schema<ITask>(
       type: String,
       default: null,
     },
+    attachments: {
+      type: [AttachmentSchema],
+      default: [],
+      validate: {
+        validator: function (attachments: unknown[]) {
+          return attachments.length <= 20;
+        },
+        message: 'No puedes agregar más de 20 adjuntos',
+      },
+    },
     tags: {
       type: [TagSchema],
       default: [],
       validate: {
-        validator: function (tags: any[]) {
+        validator: function (tags: ITag[]) {
           return tags.length <= 10;
         },
         message: 'No puedes agregar más de 10 tags',
@@ -145,11 +194,7 @@ const TaskSchema = new Schema<ITask>(
 TaskSchema.index({ boardId: 1, status: 1 });
 TaskSchema.index({ boardId: 1, order: 1 });
 
-// Eliminar el modelo existente si existe para forzar recarga con nuevo schema
-if (mongoose.models.Task) {
-  delete mongoose.models.Task;
-}
-
-const Task: Model<ITask> = mongoose.model<ITask>('Task', TaskSchema);
+const Task: Model<ITask> =
+  mongoose.models.Task || mongoose.model<ITask>('Task', TaskSchema);
 
 export default Task;

@@ -14,7 +14,7 @@ export default function CalendarEvent({ task, onClick }: CalendarEventProps) {
   const assignedUsers = (task.assignedTo || []) as unknown as { name: string; email: string; image?: string }[];
   
   // Obtener el color del tablero si está disponible
-  const boardColor = (task.boardId as any)?.color || '#6b7280';
+  const boardColor = (task.boardId as unknown as { color?: string })?.color || '#6b7280';
   
   // Convertir color hex a RGB para poder usar opacidad
   const hexToRgb = (hex: string) => {

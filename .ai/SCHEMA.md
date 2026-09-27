@@ -8,6 +8,7 @@ Contenedor principal para agrupar tableros y notas.
 - **description**: String (max 500 caracteres)
 - **owner**: ObjectId (ref: User, required)
 - **members**: [String] (Array de emails invitados, validados)
+- **color**: String (hex #RRGGBB, default '#0066cc')
 - **createdAt**: Date (timestamp automático)
 - **updatedAt**: Date (timestamp automático)
 
@@ -23,6 +24,8 @@ Tablero Kanban con tareas, puede pertenecer a un proyecto o ser independiente.
 - **members**: [String] (Array de emails invitados, validados)
 - **tags**: Array of { text: String, color: String } (máximo 20 tags)
 - **projectId**: ObjectId (ref: Project, opcional - null si es independiente)
+- **color**: String (hex #RRGGBB, default '#6b7280')
+- **order**: Number (para reordenar tableros, default: 0)
 - **createdAt**: Date (timestamp automático)
 - **updatedAt**: Date (timestamp automático)
 
@@ -33,12 +36,14 @@ Tareas dentro de un tablero con estado y ordenamiento.
 
 - **_id**: ObjectId
 - **title**: String (required, max 200 caracteres)
-- **description**: String (max 2000 caracteres)
+- **description**: String (max 50000 caracteres, incluye HTML del editor rico)
 - **status**: Enum ['todo', 'in-progress', 'done'] (default: 'todo')
 - **boardId**: ObjectId (ref: Board, required)
 - **assignedTo**: [ObjectId] (ref: User)
 - **imageUrl**: String (URL de imagen, opcional)
 - **tags**: Array of { text: String, color: String } (máximo 10 tags)
+- **comments**: [Comment] (subdocumentos embebidos: authorId, authorName, authorImage, content max 2000, replies[], createdAt)
+  - **replies**: [Reply] (misma estructura que Comment, sin replies anidadas)
 - **order**: Number (para ordenamiento en columnas, default: 0)
 - **dueDate**: Date (fecha límite, opcional)
 - **deliveryDate**: Date (fecha de entrega, opcional)
@@ -57,17 +62,19 @@ Notas con editor de texto rico, pueden ser privadas o compartidas.
 - **owner**: ObjectId (ref: User, required)
 - **members**: [String] (Array de emails invitados, validados)
 - **projectId**: ObjectId (ref: Project, opcional - null si no está en proyecto)
+- **color**: String (hex #RRGGBB, default '#f59e0b')
 - **createdAt**: Date (timestamp automático)
 - **updatedAt**: Date (timestamp automático)
 
 **Índices**: owner, projectId, owner + projectId
 
 ## User (Usuario)
-Gestionado por NextAuth.js, no tiene modelo Mongoose explícito.
+Modelo Mongoose propio (`models/User.ts`) usado por el provider Credentials de NextAuth.
 
-- **name**: String
-- **email**: String (unique)
-- **image**: String (URL del avatar)
+- **name**: String (required)
+- **email**: String (unique, lowercase, validado)
+- **password**: String (hash bcrypt, `select: false`)
+- **image**: String (URL del avatar, opcional)
 
 ## Notas Técnicas
 

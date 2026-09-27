@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { createBoard } from '@/actions/board-actions';
 import { getUserProjects } from '@/actions/project-actions';
+import { IProject } from '@/types';
 import { useSession } from 'next-auth/react';
 import { X, Palette } from 'lucide-react';
 import { PROJECT_COLORS } from '@/constants/project-colors';
@@ -24,7 +25,7 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#6b7280');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId || null);
-  const [availableProjects, setAvailableProjects] = useState<any[]>([]);
+  const [availableProjects, setAvailableProjects] = useState<IProject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [error, setError] = useState('');
@@ -82,7 +83,7 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
       } else {
         setError(result.error || 'Error al crear el tablero');
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al crear el tablero');
     } finally {
       setIsLoading(false);

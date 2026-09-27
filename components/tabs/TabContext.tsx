@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 
 export interface Tab {
   id: string;
-  type: 'dashboard' | 'project' | 'board' | 'calendar';
+  type: 'dashboard' | 'project' | 'board' | 'calendar' | 'settings';
   resourceId?: string;
   title: string;
   url: string;

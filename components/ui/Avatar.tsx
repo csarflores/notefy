@@ -1,4 +1,5 @@
 import { HTMLAttributes } from 'react';
+import Image from 'next/image';
 import { cn, getInitials } from '@/lib/utils';
 
 interface AvatarProps extends HTMLAttributes<HTMLDivElement> {
@@ -33,10 +34,12 @@ export default function Avatar({
       {...props}
     >
       {src ? (
-        <img
+        <Image
           src={src}
           alt={name}
-          className="w-full h-full object-cover"
+          fill
+          sizes="48px"
+          className="object-cover"
         />
       ) : (
         <span>{initials}</span>

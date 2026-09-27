@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import TaskCalendar from '@/components/calendar/TaskCalendar';
 import EditTaskModal from '@/components/kanban/EditTaskModal';
 import { ITask } from '@/types';
@@ -17,7 +17,7 @@ export default function ProjectCalendarClient({ projectId, userId }: ProjectCale
   const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
     try {
       const result = await getProjectTasksWithDeliveryDate(projectId, userId);
       if (result.success && result.data) {
@@ -28,11 +28,11 @@ export default function ProjectCalendarClient({ projectId, userId }: ProjectCale
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId, userId]);
 
   useEffect(() => {
     loadTasks();
-  }, [projectId, userId]);
+  }, [loadTasks]);
 
   const handleTaskClick = (task: ITask) => {
     if (!task) {

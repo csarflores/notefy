@@ -12,10 +12,9 @@ interface CalendarClientProps {
   initialTasks: ITask[];
   upcomingTasks: ITask[];
   overdueTasks: ITask[];
-  userId: string;
 }
 
-export default function CalendarClient({ initialTasks, upcomingTasks, overdueTasks, userId }: CalendarClientProps) {
+export default function CalendarClient({ initialTasks, upcomingTasks, overdueTasks }: CalendarClientProps) {
   const [tasks, setTasks] = useState<ITask[]>(initialTasks);
   const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);

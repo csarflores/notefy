@@ -1,5 +1,5 @@
 import mongoose, { Schema, Model } from 'mongoose';
-import { IBoard } from '@/types';
+import { IBoard, ITag } from '@/types';
 
 const TagSchema = new Schema(
   {
@@ -50,7 +50,7 @@ const BoardSchema = new Schema<IBoard>(
       type: [TagSchema],
       default: [],
       validate: {
-        validator: function (tags: any[]) {
+        validator: function (tags: ITag[]) {
           return tags.length <= 20;
         },
         message: 'No puedes agregar más de 20 tags al tablero',
@@ -84,12 +84,9 @@ const BoardSchema = new Schema<IBoard>(
 // Índices para búsquedas optimizadas
 BoardSchema.index({ owner: 1 });
 BoardSchema.index({ projectId: 1 });
+BoardSchema.index({ members: 1 });
 
-// Eliminar el modelo existente si existe para forzar recarga con nuevo schema
-if (mongoose.models.Board) {
-  delete mongoose.models.Board;
-}
-
-const Board: Model<IBoard> = mongoose.model<IBoard>('Board', BoardSchema);
+const Board: Model<IBoard> =
+  mongoose.models.Board || mongoose.model<IBoard>('Board', BoardSchema);
 
 export default Board;

@@ -2,7 +2,9 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
+import type { View, EventProps, ToolbarProps, CalendarProps } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
+import type { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ITask } from '@/types';
@@ -10,7 +12,45 @@ import CalendarFilters, { CalendarFilters as CalendarFiltersType, FilterOption }
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-const DnDCalendar = withDragAndDrop(Calendar as any);
+// Evento del calendario: envuelve la tarea en el recurso
+interface TaskCalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  resource: ITask;
+}
+
+// boardId/assignedTo vienen "populated" en runtime aunque el tipo base sea ObjectId
+interface PopulatedRef {
+  _id?: { toString(): string };
+  name?: string;
+  toString(): string;
+}
+
+interface PopulatedBoard {
+  _id?: { toString(): string };
+  name?: string;
+  color?: string;
+  projectId?: PopulatedRef | null;
+}
+
+const getBoard = (task: ITask): PopulatedBoard | undefined =>
+  task.boardId as unknown as PopulatedBoard | undefined;
+
+const getAssignees = (task: ITask): (PopulatedRef | string)[] =>
+  task.assignedTo as unknown as (PopulatedRef | string)[];
+
+const getRefId = (ref: PopulatedRef | string | null | undefined): string | undefined => {
+  if (!ref) return undefined;
+  if (typeof ref === 'string') return ref;
+  return ref._id?.toString() ?? ref.toString();
+};
+
+const DnDCalendar = withDragAndDrop<TaskCalendarEvent>(
+  Calendar as unknown as React.ComponentType<CalendarProps<TaskCalendarEvent>>
+);
 
 const locales = { 'es': es };
 
@@ -21,6 +61,13 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales,
 });
+
+const VIEWS = [
+  { key: Views.MONTH, label: 'Mes' },
+  { key: Views.WEEK, label: 'Semana' },
+  { key: Views.DAY, label: 'Día' },
+  { key: Views.AGENDA, label: 'Lista' },
+];
 
 interface TaskCalendarProps {
   tasks: ITask[];
@@ -38,7 +85,7 @@ const hexToRgb = (hex: string) => {
 
 export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProjectFilter = false }: TaskCalendarProps) {
   const router = useRouter();
-  const [view, setView] = useState<string>(Views.MONTH);
+  const [view, setView] = useState<View>(Views.MONTH);
   const [date, setDate] = useState(new Date());
   const [filters, setFilters] = useState<CalendarFiltersType>({
     status: 'all',
@@ -50,10 +97,10 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
   const projects = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
     tasks.forEach(task => {
-      const board = task.boardId as any;
-      const project = board?.projectId;
-      if (project && typeof project === 'object' && project._id && project.name) {
-        map.set(project._id.toString(), project.name);
+      const project = getBoard(task)?.projectId;
+      const projectId = getRefId(project);
+      if (project && typeof project === 'object' && projectId && project.name) {
+        map.set(projectId, project.name);
       }
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
@@ -62,7 +109,7 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
   const boards = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
     tasks.forEach(task => {
-      const board = task.boardId as any;
+      const board = getBoard(task);
       if (board?._id && board?.name) {
         map.set(board._id.toString(), board.name);
       }
@@ -73,36 +120,30 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
   const users = useMemo<FilterOption[]>(() => {
     const map = new Map<string, string>();
     tasks.forEach(task => {
-      const assigned = task.assignedTo as any[];
-      if (Array.isArray(assigned)) {
-        assigned.forEach(user => {
-          if (user?._id && user?.name) map.set(user._id.toString(), user.name);
-        });
-      }
+      const assigned = getAssignees(task);
+      assigned.forEach(user => {
+        const uid = getRefId(user);
+        const name = typeof user === 'object' ? user.name : undefined;
+        if (uid && name) map.set(uid, name);
+      });
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [tasks]);
 
-  const events = tasks
+  const events: TaskCalendarEvent[] = tasks
     .filter(task => {
       if (!task.deliveryDate) return false;
       if (filters.status !== 'all' && task.status !== filters.status) return false;
       if (filters.projectId !== 'all') {
-        const board = task.boardId as any;
-        const project = board?.projectId;
-        const taskProjectId = project && typeof project === 'object' ? project._id?.toString() : project?.toString();
+        const taskProjectId = getRefId(getBoard(task)?.projectId);
         if (taskProjectId !== filters.projectId) return false;
       }
       if (filters.boardId !== 'all') {
-        const taskBoardId = (task.boardId as any)._id?.toString();
+        const taskBoardId = getBoard(task)?._id?.toString();
         if (taskBoardId !== filters.boardId) return false;
       }
       if (filters.assignedTo !== 'all') {
-        const assigned = task.assignedTo as any[];
-        const isAssigned = Array.isArray(assigned) && assigned.some(user => {
-          const uid = typeof user === 'object' ? user._id?.toString() : user?.toString();
-          return uid === filters.assignedTo;
-        });
+        const isAssigned = getAssignees(task).some(user => getRefId(user) === filters.assignedTo);
         if (!isAssigned) return false;
       }
       return true;
@@ -117,30 +158,25 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
     }));
 
   const handleNavigate = useCallback((newDate: Date) => setDate(newDate), []);
-  const handleViewChange = useCallback((newView: string) => setView(newView), []);
+  const handleViewChange = useCallback((newView: View) => setView(newView), []);
   const handleFilterChange = useCallback((newFilters: CalendarFiltersType) => setFilters(newFilters), []);
 
-  const handleEventClick = useCallback((event: any) => {
+  const handleEventClick = useCallback((event: TaskCalendarEvent) => {
     if (onTaskClick) {
       onTaskClick(event.resource);
     } else {
-      const boardId = event.resource.boardId._id.toString();
-      router.push(`/board/${boardId}`);
+      const boardId = getBoard(event.resource)?._id?.toString();
+      if (boardId) router.push(`/board/${boardId}`);
     }
   }, [onTaskClick, router]);
 
-  const handleEventDrop = useCallback(({ event, start }: any) => {
-    if (onEventDrop) onEventDrop(event.resource, start);
+  const handleEventDrop = useCallback(({ event, start }: EventInteractionArgs<TaskCalendarEvent>) => {
+    if (onEventDrop) {
+      onEventDrop(event.resource, start instanceof Date ? start : new Date(start));
+    }
   }, [onEventDrop]);
 
-  const VIEWS = [
-    { key: Views.MONTH, label: 'Mes' },
-    { key: Views.WEEK, label: 'Semana' },
-    { key: Views.DAY, label: 'Día' },
-    { key: Views.AGENDA, label: 'Lista' },
-  ];
-
-  const CustomToolbar = useCallback((toolbar: any) => {
+  const CustomToolbar = useCallback((toolbar: ToolbarProps<TaskCalendarEvent>) => {
     const { label, onNavigate, onView } = toolbar;
     return (
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#e0e0e0]">
@@ -189,10 +225,10 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
   }, [view, handleFilterChange, projects, boards, users, hideProjectFilter]);
 
   // Compact pill event — single line with colored dot
-  const EventComponent = useCallback(({ event }: any) => {
-    const task: ITask = event.resource;
+  const EventComponent = useCallback(({ event }: EventProps<TaskCalendarEvent>) => {
+    const task = event.resource;
     if (!task) return null;
-    const boardColor = (task.boardId as any)?.color || '#6b7280';
+    const boardColor = getBoard(task)?.color || '#6b7280';
     const isDone = task.status === 'done';
     return (
       <div className="cal-event-pill" title={task.title}>
@@ -203,11 +239,12 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
   }, []);
 
   // For week/day views, show a richer card
-  const AgendaEvent = useCallback(({ event }: any) => {
-    const task: ITask = event.resource;
+  const AgendaEvent = useCallback(({ event }: EventProps<TaskCalendarEvent>) => {
+    const task = event.resource;
     if (!task) return null;
-    const boardColor = (task.boardId as any)?.color || '#6b7280';
-    const boardName = (task.boardId as any)?.name || 'Sin tablero';
+    const board = getBoard(task);
+    const boardColor = board?.color || '#6b7280';
+    const boardName = board?.name || 'Sin tablero';
     const rgb = hexToRgb(boardColor);
     const bg = rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},0.08)` : 'rgba(107,114,128,0.08)';
     const isDone = task.status === 'done';
@@ -235,7 +272,7 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
         onNavigate={handleNavigate}
         onView={handleViewChange}
         date={date}
-        view={view as any}
+        view={view}
         components={{
           toolbar: CustomToolbar,
           event: EventComponent,

@@ -10,8 +10,10 @@ Para este proyecto, lee y respeta siempre los archivos locales en el orden indic
 
 ## Proyecto
 **Notefy** es un administrador de proyectos multiproyecto con:
-- Tableros Kanban con drag & drop
-- Sistema de notas con editor de texto rico
+- Tableros Kanban con drag & drop (@hello-pangea/dnd)
+- Sistema de notas con editor de texto rico (TipTap)
+- Calendario de tareas (react-big-calendar)
+- Comentarios y respuestas en tareas
 - Colaboración por email (miembros)
 - Diseño inspirado en Apple
 

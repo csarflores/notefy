@@ -6,22 +6,24 @@ import Board from '@/models/Board';
 import Task from '@/models/Task';
 import { CreateBoardInput, UpdateBoardInput, ApiResponse, IBoard, IUser } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
+import { deleteS3Prefix, S3_KEY_PREFIX } from '@/lib/s3';
+import {
+  getAuthUser,
+  isSelf,
+  findAccessibleBoard,
+  findAccessibleProject,
+  findOwnedBoard,
+} from '@/lib/auth-helpers';
 
 // Obtener todos los tableros del usuario
 export async function getUserBoards(userId: string): Promise<ApiResponse<IBoard[]>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     await connectDB();
-
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
 
     const boards = await Board.find({
       $or: [
@@ -46,18 +48,12 @@ export async function getProjectBoards(projectId: string, userId: string): Promi
       return { success: false, error: 'ID de proyecto inválido' };
     }
 
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     await connectDB();
-
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
 
     const boards = await Board.find({
       projectId: projectId,
@@ -79,14 +75,12 @@ export async function getProjectBoards(projectId: string, userId: string): Promi
 // Obtener un tablero por ID
 export async function getBoardById(boardId: string): Promise<ApiResponse<IBoard>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const board = await Board.findById(boardId);
-
+    const board = await findAccessibleBoard(boardId, user);
     if (!board) {
       return { success: false, error: 'Tablero no encontrado' };
     }
@@ -104,14 +98,12 @@ export async function getBoardUsers(
   boardId: string
 ): Promise<ApiResponse<IUser[]>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const board = await Board.findById(boardId).lean();
-
+    const board = await findAccessibleBoard(boardId, user);
     if (!board) {
       return { success: false, error: 'Tablero no encontrado' };
     }
@@ -146,8 +138,9 @@ export async function createBoard(
   data: CreateBoardInput
 ): Promise<ApiResponse<IBoard>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     if (!data.name || data.name.trim().length === 0) {
@@ -163,8 +156,7 @@ export async function createBoard(
     let projectMembers: string[] = [];
 
     if (data.projectId) {
-      const Project = (await import('@/models/Project')).default;
-      const project = await Project.findById(data.projectId);
+      const project = await findAccessibleProject(data.projectId, user);
       if (!project) {
         return { success: false, error: 'Proyecto no encontrado' };
       }
@@ -172,17 +164,15 @@ export async function createBoard(
       const User = (await import('@/models/User')).default;
       const owner = await User.findById(project.owner).lean();
       const ownerEmail = owner?.email;
-      const creator = await User.findById(userId).lean();
-      const creatorEmail = creator?.email;
-      
+
       projectMembers = project.members || [];
       // Asegurar que el email del owner esté en la lista
       if (ownerEmail && !projectMembers.includes(ownerEmail)) {
         projectMembers.push(ownerEmail);
       }
       // Asegurar que el email del creador esté en la lista
-      if (creatorEmail && !projectMembers.includes(creatorEmail)) {
-        projectMembers.push(creatorEmail);
+      if (!projectMembers.includes(user.email)) {
+        projectMembers.push(user.email);
       }
     }
 
@@ -216,31 +206,34 @@ export async function createBoard(
   }
 }
 
-// Actualizar un tablero
+// Actualizar un tablero (solo el propietario)
 export async function updateBoard(
   boardId: string,
   data: UpdateBoardInput
 ): Promise<ApiResponse<IBoard>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
     if (data.projectId !== undefined && data.projectId !== null && !isValidObjectId(data.projectId)) {
       return { success: false, error: 'ID de proyecto inválido' };
     }
 
-    await connectDB();
+    const board = await findOwnedBoard(boardId, user);
+    if (!board) {
+      return { success: false, error: 'Tablero no encontrado o sin permisos' };
+    }
 
     if (data.projectId) {
-      const Project = (await import('@/models/Project')).default;
-      const project = await Project.findById(data.projectId);
+      const project = await findAccessibleProject(data.projectId, user);
       if (!project) {
         return { success: false, error: 'Proyecto no encontrado' };
       }
     }
 
-    const updateData: any = {};
+    const updateData: UpdateBoardInput = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.description !== undefined) updateData.description = data.description.trim();
     if (data.color !== undefined) updateData.color = data.color;
@@ -258,7 +251,7 @@ export async function updateBoard(
     }
 
     revalidatePath('/dashboard');
-    revalidatePath(`/project/${boardId}`);
+    revalidatePath(`/board/${boardId}`);
     if (updatedBoard.projectId) {
       revalidatePath(`/parent-project/${updatedBoard.projectId}`);
     }
@@ -270,22 +263,25 @@ export async function updateBoard(
   }
 }
 
-// Eliminar un tablero
+// Eliminar un tablero (solo el propietario)
 export async function deleteBoard(boardId: string): Promise<ApiResponse<null>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const board = await Board.findById(boardId);
+    const board = await findOwnedBoard(boardId, user);
     if (!board) {
-      return { success: false, error: 'Tablero no encontrado' };
+      return { success: false, error: 'Tablero no encontrado o sin permisos' };
     }
 
-    await Task.deleteMany({ projectId: boardId });
+    const taskIds = await Task.find({ boardId }).select('_id').lean();
+    await Task.deleteMany({ boardId });
     await Board.findByIdAndDelete(boardId);
+    await Promise.all(
+      taskIds.map((t) => deleteS3Prefix(`${S3_KEY_PREFIX}/tareas/${t._id}/`))
+    );
 
     revalidatePath('/dashboard');
     if (board.projectId) {
@@ -299,26 +295,24 @@ export async function deleteBoard(boardId: string): Promise<ApiResponse<null>> {
   }
 }
 
-// Agregar miembro al tablero
+// Agregar miembro al tablero (solo el propietario)
 export async function addBoardMember(
   boardId: string,
   email: string
 ): Promise<ApiResponse<IBoard>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       return { success: false, error: 'Email inválido' };
     }
 
-    await connectDB();
-
-    const board = await Board.findById(boardId);
-
+    const board = await findOwnedBoard(boardId, user);
     if (!board) {
-      return { success: false, error: 'Tablero no encontrado' };
+      return { success: false, error: 'Tablero no encontrado o sin permisos' };
     }
 
     if (board.members.includes(email)) {
@@ -328,7 +322,7 @@ export async function addBoardMember(
     board.members.push(email);
     await board.save();
 
-    revalidatePath(`/project/${boardId}`);
+    revalidatePath(`/board/${boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(board)) };
   } catch (error) {
@@ -337,28 +331,26 @@ export async function addBoardMember(
   }
 }
 
-// Eliminar miembro del tablero
+// Eliminar miembro del tablero (solo el propietario)
 export async function removeBoardMember(
   boardId: string,
   email: string
 ): Promise<ApiResponse<IBoard>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const board = await Board.findById(boardId);
-
+    const board = await findOwnedBoard(boardId, user);
     if (!board) {
-      return { success: false, error: 'Tablero no encontrado' };
+      return { success: false, error: 'Tablero no encontrado o sin permisos' };
     }
 
     board.members = board.members.filter((member) => member !== email);
     await board.save();
 
-    revalidatePath(`/project/${boardId}`);
+    revalidatePath(`/board/${boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(board)) };
   } catch (error) {
@@ -373,8 +365,15 @@ export async function reorderBoards(
   boardOrders: Array<{ boardId: string; order: number; projectId?: string | null }>
 ): Promise<ApiResponse<IBoard[]>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+
+    // Validar todos los IDs
+    const invalidIds = boardOrders.filter(bo => !isValidObjectId(bo.boardId));
+    if (invalidIds.length > 0) {
+      return { success: false, error: 'Algunos IDs de tablero son inválidos' };
     }
 
     await connectDB();
@@ -388,6 +387,18 @@ export async function reorderBoards(
 
     if (boards.length !== boardOrders.length) {
       return { success: false, error: 'No tienes permiso para reordenar algunos tableros' };
+    }
+
+    // Verificar acceso a los proyectos de destino
+    const targetProjectIds = [...new Set(
+      boardOrders
+        .map(bo => bo.projectId)
+        .filter((pid): pid is string => !!pid)
+    )];
+    for (const pid of targetProjectIds) {
+      if (!isValidObjectId(pid) || !(await findAccessibleProject(pid, user))) {
+        return { success: false, error: 'Proyecto de destino no encontrado o sin permisos' };
+      }
     }
 
     // Actualizar el orden de cada tablero
@@ -407,52 +418,5 @@ export async function reorderBoards(
   } catch (error) {
     console.error('Error al reordenar tableros:', error);
     return { success: false, error: 'Error al reordenar los tableros' };
-  }
-}
-
-// Convertir un project existente a board on-the-fly
-export async function createBoardFromProject(projectId: string): Promise<ApiResponse<IBoard>> {
-  try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
-    }
-
-    await connectDB();
-
-    const Project = (await import('@/models/Project')).default;
-    const Task = (await import('@/models/Task')).default;
-
-    const project = await Project.findById(projectId);
-
-    if (!project) {
-      return { success: false, error: 'Proyecto no encontrado' };
-    }
-
-    // Crear un nuevo Board con los datos del Project
-    const board = new Board({
-      _id: project._id, // Usar el mismo ID
-      name: project.name,
-      description: project.description || '',
-      owner: project.owner,
-      members: project.members || [],
-      tags: [],
-      projectId: null,
-    });
-
-    await board.save();
-
-    // Migrar tasks asociadas a este project
-    const tasks = await Task.find({ projectId: project._id });
-    if (tasks.length > 0) {
-      await Task.updateMany(
-        { projectId: project._id },
-        { boardId: project._id }
-      );
-    }
-
-    return { success: true, data: JSON.parse(JSON.stringify(board)) };
-  } catch (error) {
-    console.error('Error al convertir project a board:', error);
-    return { success: false, error: 'Error al convertir el proyecto a tablero' };
   }
 }

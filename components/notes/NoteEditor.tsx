@@ -1,8 +1,9 @@
 'use client';
 
 import { useEditor, EditorContent } from '@tiptap/react';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import StarterKit from '@tiptap/starter-kit';
+import TipTapImage from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import Link from '@tiptap/extension-link';
@@ -27,8 +28,12 @@ import {
   Link as LinkIcon,
   Underline as UnderlineIcon,
   Palette,
+  Image as ImageIcon,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useUpload } from '@/hooks/useUpload';
+import type { UploadScope } from '@/actions/upload-actions';
 
 const lowlight = createLowlight(common);
 
@@ -40,6 +45,9 @@ interface NoteEditorProps {
   maxLength?: number;
   showCharCount?: boolean;
   minHeight?: string;
+  // Si ambos están presentes, el editor permite subir imágenes a S3
+  uploadScope?: UploadScope;
+  uploadResourceId?: string;
 }
 
 export default function NoteEditor({
@@ -50,7 +58,13 @@ export default function NoteEditor({
   maxLength = 50000,
   showCharCount = true,
   minHeight = '200px',
+  uploadScope,
+  uploadResourceId,
 }: NoteEditorProps) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const { upload } = useUpload();
+  const canUploadImages = !!(uploadScope && uploadResourceId);
   const fixContent = (html: string) => {
     if (!html) return html;
     let fixed = html;
@@ -86,6 +100,7 @@ export default function NoteEditor({
       Bold,
       Italic,
       Strike,
+      TipTapImage.configure({ allowBase64: false, inline: false }),
       Placeholder.configure({ placeholder }),
     ],
     content: fixContent(content),
@@ -114,6 +129,26 @@ export default function NoteEditor({
           minHeight === '120px' ? 'min-h-[120px]' : 'min-h-[200px]'
         }`,
       },
+      handlePaste: (_view, event) => {
+        const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
+          f.type.startsWith('image/')
+        );
+        if (files.length === 0) return false;
+        event.preventDefault();
+        files.forEach((f) => void insertImageFile(f));
+        return true;
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved) return false;
+        const files = Array.from(event.dataTransfer?.files ?? []).filter((f) =>
+          f.type.startsWith('image/')
+        );
+        if (files.length === 0) return false;
+        event.preventDefault();
+        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        files.forEach((f) => void insertImageFile(f, pos?.pos));
+        return true;
+      },
     },
   });
 
@@ -123,6 +158,25 @@ export default function NoteEditor({
       editor.setEditable(editable);
     }
   }, [editor, editable]);
+
+  // Sube la imagen a S3 y la inserta en el editor
+  const insertImageFile = async (file: File, at?: number) => {
+    if (!uploadScope || !uploadResourceId) return;
+
+    setIsImageUploading(true);
+    const result = await upload(file, { scope: uploadScope, resourceId: uploadResourceId });
+    setIsImageUploading(false);
+
+    if ('error' in result) {
+      window.alert(result.error);
+      return;
+    }
+    if (editor && !editor.isDestroyed) {
+      const chain = editor.chain().focus();
+      if (typeof at === 'number') chain.setTextSelection(at);
+      chain.setImage({ src: result.publicUrl }).run();
+    }
+  };
 
   if (!editor) return null;
 
@@ -158,9 +212,14 @@ export default function NoteEditor({
     <span className="w-px h-4 bg-[#e5e5ea] mx-1 shrink-0" />
   );
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) await insertImageFile(file);
+  };
+
   const charCount = editor.getHTML().length;
   const isOverLimit = charCount > maxLength;
-  const pct = Math.min(charCount / maxLength, 1);
 
   return (
     <div className="overflow-hidden bg-white">
@@ -255,6 +314,19 @@ export default function NoteEditor({
             <LinkIcon className="w-3.5 h-3.5" />
           </ToolbarButton>
 
+          {canUploadImages && (
+            <ToolbarButton
+              onClick={() => imageInputRef.current?.click()}
+              title="Imagen"
+            >
+              {isImageUploading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <ImageIcon className="w-3.5 h-3.5" />
+              )}
+            </ToolbarButton>
+          )}
+
           {/* Color picker con icono */}
           <div className="relative">
             <button
@@ -295,6 +367,16 @@ export default function NoteEditor({
       )}
 
       <EditorContent editor={editor} />
+
+      {canUploadImages && (
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          onChange={handleImageSelect}
+        />
+      )}
 
       {showCharCount && (
         <div className="flex items-center justify-between px-4 py-1.5 border-t border-[#f0f0f0]">

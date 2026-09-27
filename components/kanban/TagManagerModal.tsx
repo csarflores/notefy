@@ -26,6 +26,7 @@ interface TagManagerModalProps {
   onClose: () => void;
   boardId: string;
   initialTags: ITag[];
+  canDeleteTags?: boolean;
 }
 
 interface TagRowProps {
@@ -33,9 +34,10 @@ interface TagRowProps {
   onEdit: () => void;
   onDelete: () => void;
   isLoading: boolean;
+  canDelete?: boolean;
 }
 
-function TagRow({ tag, onEdit, onDelete, isLoading }: TagRowProps) {
+function TagRow({ tag, onEdit, onDelete, isLoading, canDelete = true }: TagRowProps) {
   return (
     <div className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-[#f5f5f7] group transition-colors">
       <div
@@ -53,13 +55,15 @@ function TagRow({ tag, onEdit, onDelete, isLoading }: TagRowProps) {
         >
           <Pencil size={12} />
         </button>
-        <button
-          onClick={onDelete}
-          disabled={isLoading}
-          className="p-1.5 rounded-lg text-[#7a7a7a] hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-        >
-          <Trash2 size={12} />
-        </button>
+        {canDelete && (
+          <button
+            onClick={onDelete}
+            disabled={isLoading}
+            className="p-1.5 rounded-lg text-[#7a7a7a] hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -114,6 +118,7 @@ export default function TagManagerModal({
   onClose,
   boardId,
   initialTags,
+  canDeleteTags = true,
 }: TagManagerModalProps) {
   const router = useRouter();
   const [tags, setTags] = useState<ITag[]>(initialTags);
@@ -287,6 +292,7 @@ export default function TagManagerModal({
                 onEdit={() => startEdit(index)}
                 onDelete={() => handleDelete(index)}
                 isLoading={deletingIndex === index}
+                canDelete={canDeleteTags}
               />
             )
           )}

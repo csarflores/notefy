@@ -1,18 +1,17 @@
 import { Suspense } from 'react';
-import { Plus } from 'lucide-react';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { getUserProjects } from '@/actions/project-actions';
 import { getUserBoards } from '@/actions/board-actions';
 import { getUserNotes } from '@/actions/note-actions';
-import { getUserById } from '@/actions/user-actions';
+import { getUsersByIds } from '@/actions/user-actions';
 import DashboardClient from './DashboardClient';
 import DashboardWithDragDrop from './DashboardWithDragDrop';
 import Footer from '@/components/dashboard/Footer';
 import TabSyncer from '@/components/tabs/TabSyncer';
 
-async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; userEmail?: string }) {
+async function ProjectsAndBoardsList({ userId }: { userId: string }) {
   const [projectsResult, boardsResult, notesResult] = await Promise.all([
     getUserProjects(userId),
     getUserBoards(userId),
@@ -34,24 +33,21 @@ async function ProjectsAndBoardsList({ userId, userEmail }: { userId: string; us
   // Filtrar notas: solo mostrar notas que NO están en un proyecto
   const unassignedNotes = allNotes.filter((note) => !note.projectId);
 
-  // Obtener información del owner de cada nota
-  const notesWithOwnerInfo = await Promise.all(
-    unassignedNotes.map(async (note) => {
-      const ownerResult = await getUserById(note.owner.toString());
-      if (ownerResult.success && ownerResult.data) {
-        return {
-          note,
-          ownerEmail: ownerResult.data.email || '',
-          ownerName: ownerResult.data.name || ''
-        };
-      }
-      return {
-        note,
-        ownerEmail: '',
-        ownerName: ''
-      };
-    })
+  // Obtener información del owner de cada nota (una sola consulta)
+  const ownerIds = [...new Set(unassignedNotes.map((note) => note.owner.toString()))];
+  const ownersResult = await getUsersByIds(ownerIds);
+  const ownersById = new Map(
+    (ownersResult.data || []).map((owner) => [owner._id.toString(), owner])
   );
+
+  const notesWithOwnerInfo = unassignedNotes.map((note) => {
+    const owner = ownersById.get(note.owner.toString());
+    return {
+      note,
+      ownerEmail: owner?.email || '',
+      ownerName: owner?.name || ''
+    };
+  });
 
   if (allProjects.length === 0 && allBoards.length === 0 && unassignedNotes.length === 0) {
     return (
@@ -154,7 +150,7 @@ export default async function DashboardPage() {
         {/* Lista de proyectos y tableros */}
         <div className="mt-4 sm:mt-5">
           <Suspense fallback={<ProjectsLoading />}>
-            <ProjectsAndBoardsList userId={session.user.id} userEmail={session.user.email} />
+            <ProjectsAndBoardsList userId={session.user.id} />
           </Suspense>
         </div>
       </div>

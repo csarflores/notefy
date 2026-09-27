@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { LayoutDashboard, Folder, LayoutGrid, CalendarDays, X } from 'lucide-react';
+import { LayoutDashboard, Folder, LayoutGrid, CalendarDays, Settings, X } from 'lucide-react';
 import { useTabContext, Tab } from './TabContext';
 
 const TAB_ICONS: Record<Tab['type'], React.ElementType> = {
@@ -10,6 +10,7 @@ const TAB_ICONS: Record<Tab['type'], React.ElementType> = {
   project: Folder,
   board: LayoutGrid,
   calendar: CalendarDays,
+  settings: Settings,
 };
 
 export default function TabBar() {

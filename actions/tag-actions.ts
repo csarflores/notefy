@@ -1,53 +1,19 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import connectDB from '@/lib/mongodb';
 import Task from '@/models/Task';
-import Board from '@/models/Board';
 import { ApiResponse, ITag } from '@/types';
-import { isValidObjectId } from '@/lib/utils';
-
-export async function getProjectTags(projectId: string): Promise<ApiResponse<ITag[]>> {
-  try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
-    }
-
-    await connectDB();
-
-    const tasks = await Task.find({ boardId: projectId }).select('tags').lean();
-
-    const allTags: ITag[] = [];
-    const tagTexts = new Set<string>();
-
-    tasks.forEach((task) => {
-      if (task.tags && Array.isArray(task.tags)) {
-        task.tags.forEach((tag: ITag) => {
-          if (!tagTexts.has(tag.text.toLowerCase())) {
-            tagTexts.add(tag.text.toLowerCase());
-            allTags.push(tag);
-          }
-        });
-      }
-    });
-
-    return { success: true, data: allTags };
-  } catch (error) {
-    console.error('Error al obtener etiquetas del proyecto:', error);
-    return { success: false, error: 'Error al obtener las etiquetas' };
-  }
-}
+import { getAuthUser, findAccessibleBoard, findOwnedBoard } from '@/lib/auth-helpers';
 
 export async function getBoardTags(boardId: string): Promise<ApiResponse<ITag[]>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const board = await Board.findById(boardId).select('tags').lean();
-    if (!board) return { success: false, error: 'Tablero no encontrado' };
+    const board = await findAccessibleBoard(boardId, user);
+    if (!board) return { success: false, error: 'Tablero no encontrado o sin permisos' };
 
     return { success: true, data: JSON.parse(JSON.stringify(board.tags || [])) };
   } catch (error) {
@@ -58,8 +24,9 @@ export async function getBoardTags(boardId: string): Promise<ApiResponse<ITag[]>
 
 export async function addBoardTag(boardId: string, tag: ITag): Promise<ApiResponse<ITag[]>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
     const text = tag.text?.trim();
@@ -67,10 +34,8 @@ export async function addBoardTag(boardId: string, tag: ITag): Promise<ApiRespon
     if (text.length > 30) return { success: false, error: 'El texto no puede exceder 30 caracteres' };
     if (!/^#[0-9A-F]{6}$/i.test(tag.color)) return { success: false, error: 'Color inválido' };
 
-    await connectDB();
-
-    const board = await Board.findById(boardId).select('tags');
-    if (!board) return { success: false, error: 'Tablero no encontrado' };
+    const board = await findAccessibleBoard(boardId, user);
+    if (!board) return { success: false, error: 'Tablero no encontrado o sin permisos' };
 
     const exists = board.tags.some((t: ITag) => t.text.toLowerCase() === text.toLowerCase());
     if (exists) return { success: false, error: 'Ya existe una etiqueta con ese nombre' };
@@ -94,8 +59,9 @@ export async function updateBoardTag(
   newTag: ITag
 ): Promise<ApiResponse<ITag[]>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
     const newText = newTag.text?.trim();
@@ -103,10 +69,8 @@ export async function updateBoardTag(
     if (newText.length > 30) return { success: false, error: 'El texto no puede exceder 30 caracteres' };
     if (!/^#[0-9A-F]{6}$/i.test(newTag.color)) return { success: false, error: 'Color inválido' };
 
-    await connectDB();
-
-    const board = await Board.findById(boardId).select('tags');
-    if (!board) return { success: false, error: 'Tablero no encontrado' };
+    const board = await findAccessibleBoard(boardId, user);
+    if (!board) return { success: false, error: 'Tablero no encontrado o sin permisos' };
 
     const tagIndex = board.tags.findIndex((t: ITag) => t.text.toLowerCase() === oldText.toLowerCase());
     if (tagIndex === -1) return { success: false, error: 'Etiqueta no encontrada' };
@@ -138,14 +102,14 @@ export async function updateBoardTag(
 
 export async function deleteBoardTag(boardId: string, tagText: string): Promise<ApiResponse<ITag[]>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const board = await Board.findById(boardId).select('tags');
-    if (!board) return { success: false, error: 'Tablero no encontrado' };
+    // Solo el propietario del tablero puede eliminar etiquetas
+    const board = await findOwnedBoard(boardId, user);
+    if (!board) return { success: false, error: 'Solo el propietario del tablero puede eliminar etiquetas' };
 
     board.tags = board.tags.filter((t: ITag) => t.text.toLowerCase() !== tagText.toLowerCase());
     await board.save();

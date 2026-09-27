@@ -3,26 +3,23 @@
 import { revalidatePath } from 'next/cache';
 import connectDB from '@/lib/mongodb';
 import Project from '@/models/Project';
-import Task from '@/models/Task';
-import { CreateProjectInput, UpdateProjectInput, ApiResponse, IProject, ITag, IUser } from '@/types';
-import { isValidObjectId } from '@/lib/utils';
+import { CreateProjectInput, UpdateProjectInput, ApiResponse, IProject, IUser } from '@/types';
+import {
+  getAuthUser,
+  isSelf,
+  findAccessibleProject,
+  findOwnedProject,
+} from '@/lib/auth-helpers';
 
 // Obtener todos los proyectos del usuario
 export async function getUserProjects(userId: string): Promise<ApiResponse<IProject[]>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     await connectDB();
-
-    // Obtener el email del usuario para buscar en members
-    const User = (await import('@/models/User')).default;
-    const user = await User.findById(userId).lean();
-
-    if (!user) {
-      return { success: false, error: 'Usuario no encontrado' };
-    }
 
     // Buscar proyectos donde el usuario es owner O está en members
     const projects = await Project.find({
@@ -44,14 +41,12 @@ export async function getUserProjects(userId: string): Promise<ApiResponse<IProj
 // Obtener un proyecto por ID
 export async function getProjectById(projectId: string): Promise<ApiResponse<IProject>> {
   try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const project = await Project.findById(projectId);
-
+    const project = await findAccessibleProject(projectId, user);
     if (!project) {
       return { success: false, error: 'Proyecto no encontrado' };
     }
@@ -70,8 +65,9 @@ export async function createProject(
   data: CreateProjectInput
 ): Promise<ApiResponse<IProject>> {
   try {
-    if (!isValidObjectId(userId)) {
-      return { success: false, error: 'ID de usuario inválido' };
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
     }
 
     if (!data.name || data.name.trim().length === 0) {
@@ -97,19 +93,23 @@ export async function createProject(
   }
 }
 
-// Actualizar un proyecto
+// Actualizar un proyecto (solo el propietario)
 export async function updateProject(
   projectId: string,
   data: UpdateProjectInput
 ): Promise<ApiResponse<IProject>> {
   try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
+    const project = await findOwnedProject(projectId, user);
+    if (!project) {
+      return { success: false, error: 'Proyecto no encontrado o sin permisos' };
+    }
 
-    const updateData: any = {};
+    const updateData: UpdateProjectInput = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.description !== undefined) updateData.description = data.description.trim();
     if (data.color !== undefined) updateData.color = data.color;
@@ -135,26 +135,26 @@ export async function updateProject(
   }
 }
 
-// Eliminar un proyecto (los tableros quedan sin proyecto)
+// Eliminar un proyecto (los tableros y notas quedan sin proyecto, solo el propietario)
 export async function deleteProject(projectId: string): Promise<ApiResponse<null>> {
   try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const project = await Project.findById(projectId);
+    const project = await findOwnedProject(projectId, user);
     if (!project) {
-      return { success: false, error: 'Proyecto no encontrado' };
+      return { success: false, error: 'Proyecto no encontrado o sin permisos' };
     }
 
-    // Actualizar tableros para que queden sin proyecto
+    // Actualizar tableros y notas para que queden sin proyecto
     const Board = (await import('@/models/Board')).default;
-    await Board.updateMany(
-      { projectId: projectId },
-      { $set: { projectId: null } }
-    );
+    const Note = (await import('@/models/Note')).default;
+    await Promise.all([
+      Board.updateMany({ projectId: projectId }, { $set: { projectId: null } }),
+      Note.updateMany({ projectId: projectId }, { $set: { projectId: null } }),
+    ]);
 
     await Project.findByIdAndDelete(projectId);
 
@@ -167,26 +167,24 @@ export async function deleteProject(projectId: string): Promise<ApiResponse<null
   }
 }
 
-// Agregar miembro al proyecto
+// Agregar miembro al proyecto (solo el propietario)
 export async function addProjectMember(
   projectId: string,
   email: string
 ): Promise<ApiResponse<IProject>> {
   try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       return { success: false, error: 'Email inválido' };
     }
 
-    await connectDB();
-
-    const project = await Project.findById(projectId);
-
+    const project = await findOwnedProject(projectId, user);
     if (!project) {
-      return { success: false, error: 'Proyecto no encontrado' };
+      return { success: false, error: 'Proyecto no encontrado o sin permisos' };
     }
 
     if (project.members.includes(email)) {
@@ -203,7 +201,6 @@ export async function addProjectMember(
       { $addToSet: { members: email } }
     );
 
-    revalidatePath(`/project/${projectId}`);
     revalidatePath(`/parent-project/${projectId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(project)) };
@@ -213,22 +210,20 @@ export async function addProjectMember(
   }
 }
 
-// Eliminar miembro del proyecto
+// Eliminar miembro del proyecto (solo el propietario)
 export async function removeProjectMember(
   projectId: string,
   email: string
 ): Promise<ApiResponse<IProject>> {
   try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const project = await Project.findById(projectId);
-
+    const project = await findOwnedProject(projectId, user);
     if (!project) {
-      return { success: false, error: 'Proyecto no encontrado' };
+      return { success: false, error: 'Proyecto no encontrado o sin permisos' };
     }
 
     project.members = project.members.filter((member) => member !== email);
@@ -241,7 +236,6 @@ export async function removeProjectMember(
       { $pull: { members: email } }
     );
 
-    revalidatePath(`/project/${projectId}`);
     revalidatePath(`/parent-project/${projectId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(project)) };
@@ -251,54 +245,26 @@ export async function removeProjectMember(
   }
 }
 
-// Agregar tag al proyecto
-export async function addProjectTag(
-  projectId: string,
-  tag: ITag
-): Promise<ApiResponse<IProject>> {
-  try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
-    }
-
-    await connectDB();
-
-    const project = await Project.findById(projectId);
-
-    if (!project) {
-      return { success: false, error: 'Proyecto no encontrado' };
-    }
-
-    // Esta función ya no se usa - las etiquetas se obtienen de las tareas
-    return { success: false, error: 'Función deprecada - usar getProjectTags de tag-actions' };
-  } catch (error) {
-    console.error('Error al agregar tag:', error);
-    return { success: false, error: 'Error al agregar la etiqueta' };
-  }
-}
-
 // Obtener usuarios del proyecto (owner + members)
 export async function getProjectUsers(
   projectId: string
 ): Promise<ApiResponse<IUser[]>> {
   try {
-    if (!isValidObjectId(projectId)) {
-      return { success: false, error: 'ID de proyecto inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const project = await Project.findById(projectId).lean();
-
+    const project = await findAccessibleProject(projectId, user);
     if (!project) {
-      return { success: false, error: 'Proyecto no encontrado' };
+      return { success: false, error: 'Proyecto no encontrado o sin permisos' };
     }
 
     const User = (await import('@/models/User')).default;
-    
+
     // Obtener owner
     const owner = await User.findById(project.owner).select('_id name email image').lean();
-    
+
     if (!owner) {
       return { success: false, error: 'Propietario no encontrado' };
     }
@@ -317,4 +283,3 @@ export async function getProjectUsers(
     return { success: false, error: 'Error al obtener los usuarios' };
   }
 }
-

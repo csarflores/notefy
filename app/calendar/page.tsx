@@ -36,7 +36,6 @@ async function CalendarData({ userId }: { userId: string }) {
       initialTasks={tasksResult.data || []}
       upcomingTasks={upcomingResult.data || []}
       overdueTasks={overdueResult.data || []}
-      userId={userId}
     />
   );
 }

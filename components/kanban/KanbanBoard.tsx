@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { ITask } from '@/types';
 import TaskCard from './TaskCard';
@@ -14,6 +15,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 interface KanbanBoardProps {
   initialTasks: ITask[];
   boardId: string;
+  boardOwnerId?: string;
 }
 
 type TasksByStatus = {
@@ -28,8 +30,15 @@ const COLUMNS = [
   { id: 'done' as const, title: 'Finalizado', color: '#34c759' },
 ];
 
-export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps) {
+export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: KanbanBoardProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
+
+  // Solo puede eliminar una tarea quien la creó o el propietario del tablero
+  const canDeleteTask = (task: ITask) =>
+    !!currentUserId &&
+    (task.createdBy?.toString() === currentUserId || boardOwnerId === currentUserId);
   const [tasks, setTasks] = useState<TasksByStatus>({
     todo: [],
     'in-progress': [],
@@ -116,6 +125,9 @@ export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps)
   };
 
   const handleToggleSelection = (taskId: string) => {
+    const task = Object.values(tasks).flat().find((t) => t._id.toString() === taskId);
+    if (task && !canDeleteTask(task)) return;
+
     const newSelected = new Set(selectedTasks);
     if (newSelected.has(taskId)) {
       newSelected.delete(taskId);
@@ -134,6 +146,8 @@ export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps)
         setSelectedTasks(new Set());
         setSelectionMode(false);
         router.refresh();
+      } else {
+        window.alert(result.error || 'Error al eliminar las tareas');
       }
     } catch (error) {
       console.error('Error al eliminar tareas:', error);
@@ -149,8 +163,8 @@ export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps)
 
   return (
     <>
-      {/* Botón para activar modo de selección */}
-      {!selectionMode && (
+      {/* Botón para activar modo de selección (solo si hay tareas que el usuario pueda eliminar) */}
+      {!selectionMode && initialTasks.some(canDeleteTask) && (
         <div className="mb-3 flex justify-end">
           <Button
             variant="secondary"
@@ -273,8 +287,9 @@ export default function KanbanBoard({ initialTasks, boardId }: KanbanBoardProps)
                               snapshot.isDragging ? 'opacity-50 rotate-2' : ''
                             }`}
                           >
-                            <TaskCard 
+                            <TaskCard
                               task={task}
+                              canDelete={canDeleteTask(task)}
                               selectionMode={selectionMode}
                               isSelected={selectedTasks.has(task._id.toString())}
                               onToggleSelection={handleToggleSelection}

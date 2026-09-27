@@ -39,8 +39,16 @@ Eres un Desarrollador Senior Full Stack experto en Next.js 15, Tailwind CSS y Mo
 2. **Visibilidad:** Notas pueden ser `private` (solo owner) o `shared` (owner + members).
 3. **Propietario:** Todo recurso tiene un `owner` que es el usuario creador.
 
+### Autorización (OBLIGATORIO)
+1. **Toda Server Action** debe empezar con `const user = await getAuthUser()` de `lib/auth-helpers.ts` y rechazar si es null.
+2. **Acceso a recursos:** usar `findAccessibleBoard` / `findAccessibleProject` / `findAccessibleTask` (owner o member) para lectura y colaboración.
+3. **Solo propietario:** usar `findOwnedBoard` / `findOwnedProject` para update/delete/gestión de miembros del recurso.
+4. **userId como parámetro:** si una action recibe `userId`, verificar `isSelf(user, userId)` — nunca confiar en el ID del cliente.
+5. **Páginas:** verificar `getServerSession(authOptions)` y redirigir a `/auth/login`; el middleware en `middleware.ts` cubre todas las rutas de la app.
+
 ## Restricciones
 - No usar librerías de componentes externas (ej. MUI, Bootstrap, shadcn/ui).
 - No usar API Routes para mutaciones, usar Server Actions.
 - No mezclar idiomas: UI en español, código en inglés.
 - No omitir tipos TypeScript.
+- NUNCA crear una Server Action sin verificación de sesión y autorización.

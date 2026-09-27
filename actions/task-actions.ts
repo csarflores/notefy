@@ -1,47 +1,34 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/mongodb';
 import Task from '@/models/Task';
+import Board from '@/models/Board';
+import { Types } from 'mongoose';
 import { CreateTaskInput, UpdateTaskInput, ApiResponse, ITask, IComment, IReply } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
+import { deleteS3Prefix, S3_KEY_PREFIX } from '@/lib/s3';
+import {
+  getAuthUser,
+  findAccessibleBoard,
+  findAccessibleTask,
+  findDeletableTask,
+} from '@/lib/auth-helpers';
 
 // Obtener todas las tareas de un tablero
 export async function getBoardTasks(boardId: string): Promise<ApiResponse<ITask[]>> {
   try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
+    const board = await findAccessibleBoard(boardId, user);
+    if (!board) {
+      return { success: false, error: 'Tablero no encontrado o sin permisos' };
+    }
 
     const tasks = await Task.find({ boardId })
-      .sort({ order: 1, createdAt: -1 })
-      .populate('assignedTo', 'name email image')
-      .lean();
-
-    return { success: true, data: JSON.parse(JSON.stringify(tasks)) };
-  } catch (error) {
-    console.error('Error al obtener tareas:', error);
-    return { success: false, error: 'Error al obtener las tareas' };
-  }
-}
-
-// Obtener tareas por estado
-export async function getTasksByStatus(
-  boardId: string,
-  status: 'todo' | 'in-progress' | 'done'
-): Promise<ApiResponse<ITask[]>> {
-  try {
-    if (!isValidObjectId(boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
-    }
-
-    await connectDB();
-
-    const tasks = await Task.find({ boardId, status })
       .sort({ order: 1, createdAt: -1 })
       .populate('assignedTo', 'name email image')
       .lean();
@@ -56,12 +43,18 @@ export async function getTasksByStatus(
 // Crear una nueva tarea
 export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITask>> {
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
     if (!data.title || data.title.trim().length === 0) {
       return { success: false, error: 'El título es requerido' };
     }
 
-    if (!isValidObjectId(data.boardId)) {
-      return { success: false, error: 'ID de tablero inválido' };
+    const board = await findAccessibleBoard(data.boardId, user);
+    if (!board) {
+      return { success: false, error: 'Tablero no encontrado o sin permisos' };
     }
 
     await connectDB();
@@ -80,10 +73,12 @@ export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITa
       title: data.title.trim(),
       description: data.description?.trim() || '',
       boardId: data.boardId,
+      createdBy: user.id,
       status: data.status || 'todo',
       assignedTo: data.assignedTo || [],
       tags: data.tags || [],
       order: newOrder,
+      imageUrl: data.imageUrl || undefined,
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
       deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : null,
     });
@@ -107,23 +102,21 @@ export async function updateTask(
   data: UpdateTaskInput
 ): Promise<ApiResponse<ITask>> {
   try {
-    if (!isValidObjectId(taskId)) {
-      return { success: false, error: 'ID de tarea inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const task = await Task.findById(taskId);
-
+    const task = await findAccessibleTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
 
     // Actualizar campos
     if (data.title !== undefined) task.title = data.title.trim();
     if (data.description !== undefined) task.description = data.description.trim();
     if (data.status !== undefined) task.status = data.status;
-    if (data.assignedTo !== undefined) task.assignedTo = data.assignedTo as any;
+    if (data.assignedTo !== undefined) task.assignedTo = data.assignedTo as unknown as Types.ObjectId[];
     if (data.tags !== undefined) task.tags = data.tags;
     if (data.order !== undefined) task.order = data.order;
     if (data.imageUrl !== undefined) task.imageUrl = data.imageUrl;
@@ -152,16 +145,14 @@ export async function moveTask(
   newOrder: number
 ): Promise<ApiResponse<ITask>> {
   try {
-    if (!isValidObjectId(taskId)) {
-      return { success: false, error: 'ID de tarea inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const task = await Task.findById(taskId);
-
+    const task = await findAccessibleTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
 
     const oldStatus = task.status;
@@ -220,35 +211,34 @@ export async function moveTask(
   }
 }
 
-// Eliminar una tarea
+// Eliminar una tarea (solo quien la creó o el propietario del tablero)
 export async function deleteTask(taskId: string): Promise<ApiResponse<null>> {
   try {
-    if (!isValidObjectId(taskId)) {
-      return { success: false, error: 'ID de tarea inválido' };
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
     }
 
-    await connectDB();
-
-    const task = await Task.findById(taskId);
-
+    const task = await findDeletableTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
 
-    const projectId = task.boardId;
+    const boardId = task.boardId;
     const status = task.status;
     const order = task.order;
 
-    // Eliminar la tarea
+    // Eliminar la tarea y sus archivos en S3
     await Task.findByIdAndDelete(taskId);
+    await deleteS3Prefix(`${S3_KEY_PREFIX}/tareas/${taskId}/`);
 
     // Reordenar las tareas restantes
     await Task.updateMany(
-      { boardId: projectId, status, order: { $gt: order } },
+      { boardId, status, order: { $gt: order } },
       { $inc: { order: -1 } }
     );
 
-    revalidatePath(`/board/${projectId}`);
+    revalidatePath(`/board/${boardId}`);
 
     return { success: true, data: null };
   } catch (error) {
@@ -260,6 +250,11 @@ export async function deleteTask(taskId: string): Promise<ApiResponse<null>> {
 // Eliminar múltiples tareas
 export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiResponse<null>> {
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
     if (!taskIds || taskIds.length === 0) {
       return { success: false, error: 'No se proporcionaron tareas para eliminar' };
     }
@@ -272,41 +267,61 @@ export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiRespons
 
     await connectDB();
 
-    // Obtener las tareas para saber el proyecto
+    // Obtener las tareas para saber el tablero
     const tasks = await Task.find({ _id: { $in: taskIds } });
 
     if (tasks.length === 0) {
       return { success: false, error: 'No se encontraron tareas' };
     }
 
-    const boardId = tasks[0].boardId;
+    // Solo se pueden eliminar tareas creadas por el usuario
+    // o tareas de tableros cuyo propietario es el usuario
+    const boardIds = [...new Set(tasks.map(t => t.boardId.toString()))];
+    const ownedBoards = await Board.find({
+      _id: { $in: boardIds },
+      owner: user.id,
+    }).select('_id').lean();
+    const ownedBoardIds = new Set(ownedBoards.map((b) => b._id.toString()));
 
-    // Eliminar todas las tareas
-    await Task.deleteMany({ _id: { $in: taskIds } });
+    const hasUnauthorized = tasks.some(
+      (t) =>
+        t.createdBy?.toString() !== user.id &&
+        !ownedBoardIds.has(t.boardId.toString())
+    );
 
-    // Reordenar todas las tareas del tablero
-    const allTasks = await Task.find({ boardId }).sort({ status: 1, order: 1 });
-    
-    // Agrupar por estado y reordenar
-    const tasksByStatus: { [key: string]: any[] } = {
-      'todo': [],
-      'in-progress': [],
-      'done': []
-    };
-
-    allTasks.forEach(task => {
-      tasksByStatus[task.status].push(task);
-    });
-
-    // Actualizar el orden de cada grupo
-    for (const status in tasksByStatus) {
-      const statusTasks = tasksByStatus[status];
-      for (let i = 0; i < statusTasks.length; i++) {
-        await Task.findByIdAndUpdate(statusTasks[i]._id, { order: i });
-      }
+    if (hasUnauthorized) {
+      return { success: false, error: 'No tienes permiso para eliminar algunas tareas' };
     }
 
-    revalidatePath(`/board/${boardId}`);
+    // Eliminar todas las tareas y sus archivos en S3
+    await Task.deleteMany({ _id: { $in: taskIds } });
+    await Promise.all(
+      taskIds.map((id) => deleteS3Prefix(`${S3_KEY_PREFIX}/tareas/${id}/`))
+    );
+
+    // Reordenar las tareas de cada tablero afectado
+    for (const boardId of boardIds) {
+      const boardTasks = await Task.find({ boardId }).sort({ status: 1, order: 1 });
+
+      const tasksByStatus: { [key: string]: typeof boardTasks } = {
+        'todo': [],
+        'in-progress': [],
+        'done': []
+      };
+
+      boardTasks.forEach(task => {
+        tasksByStatus[task.status].push(task);
+      });
+
+      for (const status in tasksByStatus) {
+        const statusTasks = tasksByStatus[status];
+        for (let i = 0; i < statusTasks.length; i++) {
+          await Task.findByIdAndUpdate(statusTasks[i]._id, { order: i });
+        }
+      }
+
+      revalidatePath(`/board/${boardId}`);
+    }
 
     return { success: true, data: null };
   } catch (error) {
@@ -318,13 +333,9 @@ export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiRespons
 // Agregar un comentario a una tarea
 export async function addComment(taskId: string, content: string): Promise<ApiResponse<IComment>> {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const user = await getAuthUser();
+    if (!user) {
       return { success: false, error: 'No autenticado' };
-    }
-
-    if (!isValidObjectId(taskId)) {
-      return { success: false, error: 'ID de tarea inválido' };
     }
 
     const trimmed = content?.trim();
@@ -335,19 +346,17 @@ export async function addComment(taskId: string, content: string): Promise<ApiRe
       return { success: false, error: 'El comentario no puede exceder 2000 caracteres' };
     }
 
-    await connectDB();
-
-    const task = await Task.findById(taskId);
+    const task = await findAccessibleTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
 
     task.comments.push({
-      authorId: session.user.id,
-      authorName: session.user.name,
-      authorImage: session.user.image || null,
+      authorId: user.id,
+      authorName: user.name,
+      authorImage: user.image || null,
       content: trimmed,
-    } as any);
+    } as unknown as IComment);
 
     await task.save();
 
@@ -364,31 +373,29 @@ export async function addComment(taskId: string, content: string): Promise<ApiRe
 // Eliminar un comentario de una tarea (solo el autor puede eliminarlo)
 export async function deleteComment(taskId: string, commentId: string): Promise<ApiResponse<null>> {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const user = await getAuthUser();
+    if (!user) {
       return { success: false, error: 'No autenticado' };
     }
 
-    if (!isValidObjectId(taskId) || !isValidObjectId(commentId)) {
+    if (!isValidObjectId(commentId)) {
       return { success: false, error: 'ID inválido' };
     }
 
-    await connectDB();
-
-    const task = await Task.findById(taskId);
+    const task = await findAccessibleTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
 
     const commentIndex = task.comments.findIndex(
-      (c: any) => c._id.toString() === commentId
+      (c: IComment) => c._id.toString() === commentId
     );
     if (commentIndex === -1) {
       return { success: false, error: 'Comentario no encontrado' };
     }
 
-    const comment = task.comments[commentIndex] as any;
-    if (comment.authorId.toString() !== session.user.id) {
+    const comment = task.comments[commentIndex];
+    if (comment.authorId.toString() !== user.id) {
       return { success: false, error: 'No tienes permiso para eliminar este comentario' };
     }
 
@@ -411,12 +418,12 @@ export async function addReply(
   content: string
 ): Promise<ApiResponse<IReply>> {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const user = await getAuthUser();
+    if (!user) {
       return { success: false, error: 'No autenticado' };
     }
 
-    if (!isValidObjectId(taskId) || !isValidObjectId(commentId)) {
+    if (!isValidObjectId(commentId)) {
       return { success: false, error: 'ID inválido' };
     }
 
@@ -428,27 +435,25 @@ export async function addReply(
       return { success: false, error: 'La respuesta no puede exceder 2000 caracteres' };
     }
 
-    await connectDB();
-
-    const task = await Task.findById(taskId);
+    const task = await findAccessibleTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
 
     const commentIndex = task.comments.findIndex(
-      (c: any) => c._id.toString() === commentId
+      (c: IComment) => c._id.toString() === commentId
     );
     if (commentIndex === -1) {
       return { success: false, error: 'Comentario no encontrado' };
     }
 
-    const comment = task.comments[commentIndex] as any;
+    const comment = task.comments[commentIndex];
     comment.replies.push({
-      authorId: session.user.id,
-      authorName: session.user.name,
-      authorImage: session.user.image || null,
+      authorId: user.id,
+      authorName: user.name,
+      authorImage: user.image || null,
       content: trimmed,
-    });
+    } as unknown as IReply);
 
     await task.save();
 
@@ -469,38 +474,36 @@ export async function deleteReply(
   replyId: string
 ): Promise<ApiResponse<null>> {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    const user = await getAuthUser();
+    if (!user) {
       return { success: false, error: 'No autenticado' };
     }
 
-    if (!isValidObjectId(taskId) || !isValidObjectId(commentId) || !isValidObjectId(replyId)) {
+    if (!isValidObjectId(commentId) || !isValidObjectId(replyId)) {
       return { success: false, error: 'ID inválido' };
     }
 
-    await connectDB();
-
-    const task = await Task.findById(taskId);
+    const task = await findAccessibleTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
 
     const commentIndex = task.comments.findIndex(
-      (c: any) => c._id.toString() === commentId
+      (c: IComment) => c._id.toString() === commentId
     );
     if (commentIndex === -1) {
       return { success: false, error: 'Comentario no encontrado' };
     }
 
-    const comment = task.comments[commentIndex] as any;
+    const comment = task.comments[commentIndex];
     const replyIndex = comment.replies.findIndex(
-      (r: any) => r._id.toString() === replyId
+      (r: IReply) => r._id.toString() === replyId
     );
     if (replyIndex === -1) {
       return { success: false, error: 'Respuesta no encontrada' };
     }
 
-    if (comment.replies[replyIndex].authorId.toString() !== session.user.id) {
+    if (comment.replies[replyIndex].authorId.toString() !== user.id) {
       return { success: false, error: 'No tienes permiso para eliminar esta respuesta' };
     }
 

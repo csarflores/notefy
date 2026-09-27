@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { MoreHorizontal, Edit2, Trash2, ChevronRight, Folder, ExternalLink } from 'lucide-react';
 import EditProjectModal from './EditProjectModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -19,7 +20,9 @@ interface ProjectCardProps {
 
 export default function ProjectCard({ project, boardCount, onBoardDrop }: ProjectCardProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const { openTab } = useTabContext();
+  const isProjectOwner = project.owner?.toString() === session?.user?.id;
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -132,7 +135,7 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
           items={[
             { label: 'Editar', icon: Edit2, onClick: () => setShowEditModal(true) },
             { label: 'Abrir', icon: ExternalLink, onClick: handleOpen },
-            { label: 'Eliminar', icon: Trash2, onClick: () => setShowDeleteDialog(true), variant: 'danger', separator: true },
+            ...(isProjectOwner ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setShowDeleteDialog(true), variant: 'danger' as const, separator: true }] : []),
           ]}
           onClose={() => setCtxMenu(null)}
         />
@@ -151,7 +154,7 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
         message={
           <div className="space-y-2">
             <p className="text-[#7a7a7a]">
-              ¿Eliminar el proyecto <strong>"{project.name}"</strong>?
+              ¿Eliminar el proyecto <strong>&quot;{project.name}&quot;</strong>?
             </p>
             <p className="text-sm text-red-500">
               Se eliminarán permanentemente sus {boardCount} tablero{boardCount === 1 ? '' : 's'} y todas sus tareas.

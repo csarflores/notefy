@@ -12,6 +12,7 @@ const NoteSchema = new Schema<INote>(
     content: {
       type: String,
       default: '',
+      maxlength: [100000, 'El contenido no puede exceder 100000 caracteres (incluye etiquetas HTML del editor)'],
     },
     visibility: {
       type: String,
@@ -61,12 +62,9 @@ const NoteSchema = new Schema<INote>(
 NoteSchema.index({ owner: 1 });
 NoteSchema.index({ projectId: 1 });
 NoteSchema.index({ owner: 1, projectId: 1 });
+NoteSchema.index({ members: 1 });
 
-// Eliminar el modelo existente si existe para forzar recarga con nuevo schema
-if (mongoose.models.Note) {
-  delete mongoose.models.Note;
-}
-
-const Note: Model<INote> = mongoose.model<INote>('Note', NoteSchema);
+const Note: Model<INote> =
+  mongoose.models.Note || mongoose.model<INote>('Note', NoteSchema);
 
 export default Note;

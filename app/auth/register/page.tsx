@@ -60,7 +60,7 @@ export default function RegisterPage() {
         // Si falla el auto-login, redirigir a login
         router.push('/auth/login');
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al crear la cuenta');
       setIsLoading(false);
     }

@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useNotification } from '@/components/ui/NotificationContext';
 import { reorderBoards } from '@/actions/board-actions';
 import BoardCard from '@/components/dashboard/BoardCard';
+import { IBoard } from '@/types';
 
 interface BoardsListClientProps {
   projectId: string;
   userId: string;
-  boards: any[];
+  boards: IBoard[];
 }
 
 export default function BoardsListClient({ projectId, userId, boards }: BoardsListClientProps) {
@@ -18,7 +19,7 @@ export default function BoardsListClient({ projectId, userId, boards }: BoardsLi
   const [isUpdating, setIsUpdating] = useState(false);
   const [draggedBoard, setDraggedBoard] = useState<{ id: string; index: number } | null>(null);
 
-  const handleBoardDragStart = (boardId: string, index: number, boardProjectId?: string | null) => {
+  const handleBoardDragStart = (boardId: string, index: number) => {
     setDraggedBoard({ id: boardId, index });
   };
 

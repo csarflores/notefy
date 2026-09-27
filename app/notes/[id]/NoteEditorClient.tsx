@@ -32,7 +32,7 @@ export function NoteEditorClient({ note, userId }: { note: INote; userId: string
       } else {
         showNotification(result.error || 'Error al guardar la nota', 'error');
       }
-    } catch (error) {
+    } catch {
       showNotification('Error al guardar la nota', 'error');
     } finally {
       setIsSaving(false);
@@ -59,7 +59,7 @@ export function NoteEditorClient({ note, userId }: { note: INote; userId: string
       } else {
         showNotification(result.error || 'Error al eliminar la nota', 'error');
       }
-    } catch (error) {
+    } catch {
       showNotification('Error al eliminar la nota', 'error');
     } finally {
       setIsDeleting(false);
@@ -154,6 +154,8 @@ export function NoteEditorClient({ note, userId }: { note: INote; userId: string
             onChange={setContent}
             editable={isEditing}
             placeholder="Escribe el contenido de tu nota..."
+            uploadScope="note-image"
+            uploadResourceId={note._id.toString()}
           />
         </div>
       </div>

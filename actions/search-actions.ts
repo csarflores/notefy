@@ -5,7 +5,7 @@ import Project from '@/models/Project';
 import Board from '@/models/Board';
 import Note from '@/models/Note';
 import Task from '@/models/Task';
-import { isValidObjectId } from '@/lib/utils';
+import { getAuthUser, isSelf } from '@/lib/auth-helpers';
 
 export interface SearchResult {
   id: string;
@@ -16,16 +16,23 @@ export interface SearchResult {
 }
 
 export async function globalSearch(userId: string, query: string): Promise<SearchResult[]> {
-  if (!query.trim() || !isValidObjectId(userId)) return [];
+  const user = await getAuthUser();
+  if (!user || !isSelf(user, userId)) return [];
+
+  if (!query.trim()) return [];
 
   await connectDB();
 
-  const User = (await import('@/models/User')).default;
-  const user = await User.findById(userId).lean();
-  if (!user) return [];
-
-  const q = new RegExp(query, 'i');
+  // Escapar caracteres especiales de regex para evitar ReDoS/inyección
+  const escaped = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const q = new RegExp(escaped, 'i');
   const limit = 5;
+
+  // Tableros accesibles para acotar la búsqueda de tareas
+  const accessibleBoards = await Board.find({
+    $or: [{ owner: userId }, { members: user.email }],
+  }).select('_id').lean();
+  const boardIds = accessibleBoards.map(b => b._id);
 
   const [projects, boards, notes, tasks] = await Promise.all([
     Project.find({
@@ -49,7 +56,7 @@ export async function globalSearch(userId: string, query: string): Promise<Searc
       ],
     }).limit(limit).lean(),
 
-    Task.find({ title: q }).limit(limit).lean(),
+    Task.find({ boardId: { $in: boardIds }, title: q }).limit(limit).lean(),
   ]);
 
   const results: SearchResult[] = [

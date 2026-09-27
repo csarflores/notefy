@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2, LayoutGrid, Calendar, Tags } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import CreateTaskModal from '@/components/kanban/CreateTaskModal';
@@ -25,6 +26,8 @@ type ViewType = 'kanban' | 'calendar';
 
 export default function BoardClient({ board, tasks, boardUsers, boardTags }: BoardClientProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isBoardOwner = board.owner?.toString() === session?.user?.id;
   const [view, setView] = useState<ViewType>('kanban');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
@@ -148,16 +151,20 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
                       Administrar etiquetas
                     </button>
                   </div>
-                  <div className="h-px bg-[#f0f0f0] mx-1" />
-                  <div className="p-1">
-                    <button
-                      onClick={() => { setShowBoardMenu(false); setShowDeleteDialog(true); }}
-                      className="w-full px-3 py-2 text-left text-[13px] text-red-500 hover:bg-red-50 flex items-center gap-2.5 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={13} />
-                      Eliminar tablero
-                    </button>
-                  </div>
+                  {isBoardOwner && (
+                    <>
+                      <div className="h-px bg-[#f0f0f0] mx-1" />
+                      <div className="p-1">
+                        <button
+                          onClick={() => { setShowBoardMenu(false); setShowDeleteDialog(true); }}
+                          className="w-full px-3 py-2 text-left text-[13px] text-red-500 hover:bg-red-50 flex items-center gap-2.5 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={13} />
+                          Eliminar tablero
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </>
             )}
@@ -170,6 +177,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
         <BoardWithFilters
           tasks={tasks}
           boardId={board._id.toString()}
+          boardOwnerId={board.owner.toString()}
           boardUsers={boardUsers}
           boardTags={boardTags}
         />
@@ -213,6 +221,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
         onClose={() => setShowTagManager(false)}
         boardId={board._id.toString()}
         initialTags={boardTags}
+        canDeleteTags={isBoardOwner}
       />
 
       {/* Diálogo de confirmación de eliminación */}
@@ -224,7 +233,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
         message={
           <div className="space-y-2">
             <p className="text-[#7a7a7a]">
-              ¿Estás seguro de que deseas eliminar el tablero <strong>"{board.name}"</strong>?
+              ¿Estás seguro de que deseas eliminar el tablero <strong>&quot;{board.name}&quot;</strong>?
             </p>
             <p className="text-sm text-red-500">
               Esta acción eliminará permanentemente el tablero y todas sus tareas. No se puede deshacer.

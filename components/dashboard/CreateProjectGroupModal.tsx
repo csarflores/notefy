@@ -49,7 +49,7 @@ export default function CreateProjectGroupModal({ isOpen, onClose, userId }: Cre
       } else {
         setError(result.error || 'Error al crear el proyecto');
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al crear el proyecto');
     } finally {
       setIsLoading(false);

@@ -34,7 +34,7 @@ export default function LoginPage() {
         router.push('/dashboard');
         router.refresh();
       }
-    } catch (err) {
+    } catch {
       setError('Error al iniciar sesión');
     } finally {
       setIsLoading(false);
@@ -102,6 +102,14 @@ export default function LoginPage() {
                   disabled={isLoading}
                   required
                 />
+              </div>
+              <div className="mt-2 text-right">
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-sm text-[#0066cc] font-medium hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </div>
             </div>
 
