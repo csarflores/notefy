@@ -1,71 +1,64 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { ITask } from '@/types';
+import { ITask, IBoardColumn } from '@/types';
+import { getBoardColumns } from '@/lib/board-columns';
 import TaskCard from './TaskCard';
-import CreateTaskModal from './CreateTaskModal';
-import { moveTask, deleteMultipleTasks } from '@/actions/task-actions';
+import AddTaskComposer from './AddTaskComposer';
+import { moveTask, deleteMultipleTasks, bulkUpdateTaskStatus } from '@/actions/task-actions';
 import { useRouter } from 'next/navigation';
-import { Trash2, X, Plus } from 'lucide-react';
+import { Trash2, X, Plus, ArrowRight } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useNotification } from '@/components/ui/NotificationContext';
 
 interface KanbanBoardProps {
   initialTasks: ITask[];
   boardId: string;
   boardOwnerId?: string;
+  canEdit?: boolean;
+  canComment?: boolean;
+  columns?: IBoardColumn[];
 }
 
-type TasksByStatus = {
-  todo: ITask[];
-  'in-progress': ITask[];
-  done: ITask[];
-};
+type TasksByStatus = Record<string, ITask[]>;
 
-const COLUMNS = [
-  { id: 'todo' as const, title: 'Pendiente', color: '#ff9500' },
-  { id: 'in-progress' as const, title: 'En Proceso', color: '#0066cc' },
-  { id: 'done' as const, title: 'Finalizado', color: '#34c759' },
-];
-
-export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: KanbanBoardProps) {
+export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEdit = true, canComment = true, columns: columnsProp }: KanbanBoardProps) {
+  const columns = useMemo(() => getBoardColumns(columnsProp), [columnsProp]);
   const router = useRouter();
   const { data: session } = useSession();
+  const { showNotification } = useNotification();
   const currentUserId = session?.user?.id;
 
   // Solo puede eliminar una tarea quien la creó o el propietario del tablero
   const canDeleteTask = (task: ITask) =>
     !!currentUserId &&
     (task.createdBy?.toString() === currentUserId || boardOwnerId === currentUserId);
-  const [tasks, setTasks] = useState<TasksByStatus>({
-    todo: [],
-    'in-progress': [],
-    done: [],
-  });
+  const [tasks, setTasks] = useState<TasksByStatus>(() =>
+    Object.fromEntries(columns.map((c) => [c.id, [] as ITask[]]))
+  );
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [defaultStatus, setDefaultStatus] = useState<'todo' | 'in-progress' | 'done'>('todo');
+  const [composerFor, setComposerFor] = useState<string | null>(null);
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
 
-  // Organizar tareas por estado
+  // Organizar tareas por columna (status desconocidos van a la primera columna)
   useEffect(() => {
-    const organized: TasksByStatus = {
-      todo: [],
-      'in-progress': [],
-      done: [],
-    };
+    const organized: TasksByStatus = Object.fromEntries(columns.map((c) => [c.id, [] as ITask[]]));
 
     initialTasks.forEach((task) => {
-      organized[task.status].push(task);
+      const key = organized[task.status] ? task.status : columns[0].id;
+      organized[key].push(task);
     });
 
     // Ordenar por order
     Object.keys(organized).forEach((status) => {
-      organized[status as keyof TasksByStatus].sort((a, b) => a.order - b.order);
+      organized[status].sort((a, b) => a.order - b.order);
     });
 
     // Limpiar selección si las tareas cambian
@@ -73,7 +66,7 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
     setSelectionMode(false);
 
     setTasks(organized);
-  }, [initialTasks]);
+  }, [initialTasks, columns]);
 
   const handleDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
@@ -89,8 +82,8 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
       return;
     }
 
-    const sourceStatus = source.droppableId as keyof TasksByStatus;
-    const destStatus = destination.droppableId as keyof TasksByStatus;
+    const sourceStatus = source.droppableId;
+    const destStatus = destination.droppableId;
 
     // Optimistic update
     const newTasks = { ...tasks };
@@ -145,9 +138,10 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
         setShowDeleteDialog(false);
         setSelectedTasks(new Set());
         setSelectionMode(false);
+        showNotification(`${selectedTasks.size} ${selectedTasks.size === 1 ? 'tarea eliminada' : 'tareas eliminadas'}`, 'success');
         router.refresh();
       } else {
-        window.alert(result.error || 'Error al eliminar las tareas');
+        showNotification(result.error || 'Error al eliminar las tareas', 'error');
       }
     } catch (error) {
       console.error('Error al eliminar tareas:', error);
@@ -159,12 +153,32 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
   const handleCancelSelection = () => {
     setSelectedTasks(new Set());
     setSelectionMode(false);
+    setShowMoveMenu(false);
+  };
+
+  const handleMoveSelected = async (status: string) => {
+    setIsMoving(true);
+    try {
+      const result = await bulkUpdateTaskStatus(Array.from(selectedTasks), status);
+      if (result.success) {
+        handleCancelSelection();
+        showNotification('Tareas actualizadas', 'success');
+        router.refresh();
+      } else {
+        showNotification(result.error || 'Error al mover las tareas', 'error');
+      }
+    } catch {
+      showNotification('Error al mover las tareas', 'error');
+    } finally {
+      setIsMoving(false);
+      setShowMoveMenu(false);
+    }
   };
 
   return (
     <>
       {/* Botón para activar modo de selección (solo si hay tareas que el usuario pueda eliminar) */}
-      {!selectionMode && initialTasks.some(canDeleteTask) && (
+      {!selectionMode && canEdit && initialTasks.some(canDeleteTask) && (
         <div className="mb-3 flex justify-end">
           <Button
             variant="secondary"
@@ -184,6 +198,36 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
             {selectedTasks.size} {selectedTasks.size === 1 ? 'tarea' : 'tareas'}
           </span>
           <div className="flex gap-2">
+            <div className="relative flex-1 sm:flex-none">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowMoveMenu(!showMoveMenu)}
+                disabled={selectedTasks.size === 0 || isMoving}
+                className="w-full sm:w-auto"
+              >
+                <ArrowRight size={14} className="sm:mr-1" />
+                Mover a
+              </Button>
+              {showMoveMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowMoveMenu(false)} />
+                  <div className="absolute bottom-full left-0 mb-1 w-40 bg-white rounded-lg shadow-lg border border-[#e0e0e0] py-1 z-20">
+                    {columns.map((col) => (
+                      <button
+                        key={col.id}
+                        onClick={() => handleMoveSelected(col.id)}
+                        disabled={isMoving}
+                        className="w-full px-3 py-1.5 text-left text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
+                        {col.title}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <Button
               variant="secondary"
               size="sm"
@@ -224,8 +268,11 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
       />
 
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex flex-col md:grid md:grid-cols-3 gap-4 md:gap-6">
-        {COLUMNS.map((column) => (
+      <div
+        className="flex flex-col md:grid gap-4 md:gap-6"
+        style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+      >
+        {columns.map((column) => (
           <div key={column.id} className="flex flex-col">
             {/* Header de columna */}
             <div className="mb-3">
@@ -242,16 +289,15 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
                     {tasks[column.id].length}
                   </span>
                 </div>
-                <button
-                  onClick={() => {
-                    setDefaultStatus(column.id);
-                    setShowCreateModal(true);
-                  }}
-                  className="p-1 hover:bg-[#f5f5f7] rounded-full transition-colors"
-                  title="Crear nueva tarea"
-                >
-                  <Plus size={16} className="text-[#7a7a7a]" />
-                </button>
+                {canEdit && (
+                  <button
+                    onClick={() => setComposerFor(column.id)}
+                    className="p-1 hover:bg-[#f5f5f7] rounded-full transition-colors"
+                    title="Crear nueva tarea"
+                  >
+                    <Plus size={16} className="text-[#7a7a7a]" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -277,6 +323,7 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
                         key={task._id.toString()}
                         draggableId={task._id.toString()}
                         index={index}
+                        isDragDisabled={!canEdit}
                       >
                         {(provided, snapshot) => (
                           <div
@@ -289,10 +336,13 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
                           >
                             <TaskCard
                               task={task}
+                              isDone={column.id === columns[columns.length - 1].id}
                               canDelete={canDeleteTask(task)}
                               selectionMode={selectionMode}
                               isSelected={selectedTasks.has(task._id.toString())}
                               onToggleSelection={handleToggleSelection}
+                              canEdit={canEdit}
+                              canComment={canComment}
                             />
                           </div>
                         )}
@@ -303,17 +353,22 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId }: Kan
                 </div>
               )}
             </Droppable>
+
+            {/* Composer inline de nueva tarea */}
+            {canEdit && (
+              <div className="mt-2 px-2 sm:px-3">
+                <AddTaskComposer
+                  boardId={boardId}
+                  status={column.id}
+                  open={composerFor === column.id}
+                  onOpenChange={(open) => setComposerFor(open ? column.id : null)}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
     </DragDropContext>
-
-    <CreateTaskModal
-      isOpen={showCreateModal}
-      onClose={() => setShowCreateModal(false)}
-      projectId={boardId}
-      defaultStatus={defaultStatus}
-    />
     </>
   );
 }

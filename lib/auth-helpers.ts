@@ -6,7 +6,7 @@ import Project from '@/models/Project';
 import Note from '@/models/Note';
 import Task from '@/models/Task';
 import { isValidObjectId } from './utils';
-import { IBoard, IProject, ITask } from '@/types';
+import { IBoard, IProject, ITask, MemberRole } from '@/types';
 
 export interface AuthUser {
   id: string;
@@ -34,7 +34,10 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 interface OwnableDoc {
   owner: { toString(): string };
   members?: string[];
+  memberRoles?: Map<string, MemberRole>;
 }
+
+export type ResourceRole = 'owner' | 'editor' | 'commenter' | 'viewer' | null;
 
 export function isOwner(doc: OwnableDoc, user: AuthUser): boolean {
   return doc.owner?.toString() === user.id;
@@ -43,6 +46,25 @@ export function isOwner(doc: OwnableDoc, user: AuthUser): boolean {
 // Owner o miembro (members son emails)
 export function isMemberOrOwner(doc: OwnableDoc, user: AuthUser): boolean {
   return isOwner(doc, user) || (doc.members ?? []).includes(user.email);
+}
+
+// Rol del usuario sobre un recurso: 'owner', 'editor' (default), 'viewer' o null
+export function getResourceRole(doc: OwnableDoc, user: AuthUser): ResourceRole {
+  if (isOwner(doc, user)) return 'owner';
+  if (!(doc.members ?? []).includes(user.email)) return null;
+  return doc.memberRoles?.get(user.email) ?? 'editor';
+}
+
+// Puede modificar el recurso (owner o miembro con rol editor)
+export function canEdit(doc: OwnableDoc, user: AuthUser): boolean {
+  const role = getResourceRole(doc, user);
+  return role === 'owner' || role === 'editor';
+}
+
+// Puede comentar en el recurso (owner, editor o comentarista — no viewer)
+export function canComment(doc: OwnableDoc, user: AuthUser): boolean {
+  const role = getResourceRole(doc, user);
+  return role === 'owner' || role === 'editor' || role === 'commenter';
 }
 
 // Verifica que el userId recibido corresponde al usuario autenticado
@@ -58,7 +80,17 @@ export async function findAccessibleBoard(
   if (!isValidObjectId(boardId)) return null;
   await connectDB();
   const board = await Board.findById(boardId);
-  if (!board || !isMemberOrOwner(board, user)) return null;
+  if (!board || board.deletedAt || !isMemberOrOwner(board, user)) return null;
+  return board;
+}
+
+// Igual que findAccessibleBoard pero excluye miembros con rol 'viewer'
+export async function findEditableBoard(
+  boardId: string,
+  user: AuthUser
+): Promise<IBoard | null> {
+  const board = await findAccessibleBoard(boardId, user);
+  if (!board || !canEdit(board, user)) return null;
   return board;
 }
 
@@ -70,7 +102,7 @@ export async function findOwnedBoard(
   if (!isValidObjectId(boardId)) return null;
   await connectDB();
   const board = await Board.findById(boardId);
-  if (!board || !isOwner(board, user)) return null;
+  if (!board || board.deletedAt || !isOwner(board, user)) return null;
   return board;
 }
 
@@ -82,7 +114,17 @@ export async function findAccessibleProject(
   if (!isValidObjectId(projectId)) return null;
   await connectDB();
   const project = await Project.findById(projectId);
-  if (!project || !isMemberOrOwner(project, user)) return null;
+  if (!project || project.deletedAt || !isMemberOrOwner(project, user)) return null;
+  return project;
+}
+
+// Igual que findAccessibleProject pero excluye miembros con rol 'viewer'
+export async function findEditableProject(
+  projectId: string,
+  user: AuthUser
+): Promise<IProject | null> {
+  const project = await findAccessibleProject(projectId, user);
+  if (!project || !canEdit(project, user)) return null;
   return project;
 }
 
@@ -94,7 +136,7 @@ export async function findOwnedProject(
   if (!isValidObjectId(projectId)) return null;
   await connectDB();
   const project = await Project.findById(projectId);
-  if (!project || !isOwner(project, user)) return null;
+  if (!project || project.deletedAt || !isOwner(project, user)) return null;
   return project;
 }
 
@@ -106,9 +148,34 @@ export async function findAccessibleTask(
   if (!isValidObjectId(taskId)) return null;
   await connectDB();
   const task = await Task.findById(taskId);
-  if (!task) return null;
+  if (!task || task.deletedAt) return null;
   const board = await findAccessibleBoard(task.boardId.toString(), user);
   if (!board) return null;
+  return task;
+}
+
+// Igual que findAccessibleTask pero excluye miembros 'viewer' del tablero
+export async function findEditableTask(
+  taskId: string,
+  user: AuthUser
+): Promise<ITask | null> {
+  const task = await findAccessibleTask(taskId, user);
+  if (!task) return null;
+  const board = await findEditableBoard(task.boardId.toString(), user);
+  if (!board) return null;
+  return task;
+}
+
+// Igual que findAccessibleTask pero excluye miembros 'viewer' del tablero
+// (comentar requiere rol commenter o superior)
+export async function findCommentableTask(
+  taskId: string,
+  user: AuthUser
+): Promise<ITask | null> {
+  const task = await findAccessibleTask(taskId, user);
+  if (!task) return null;
+  const board = await findAccessibleBoard(task.boardId.toString(), user);
+  if (!board || !canComment(board, user)) return null;
   return task;
 }
 
@@ -121,7 +188,7 @@ export async function findDeletableTask(
   if (!isValidObjectId(taskId)) return null;
   await connectDB();
   const task = await Task.findById(taskId);
-  if (!task) return null;
+  if (!task || task.deletedAt) return null;
   const board = await Board.findById(task.boardId).select('owner');
   if (!board) return null;
   const isCreator = task.createdBy?.toString() === user.id;
@@ -138,7 +205,7 @@ export interface SharedUserScope {
 // (owners de recursos donde user es owner/miembro, y miembros de esos recursos)
 export async function getSharedUserScope(user: AuthUser): Promise<SharedUserScope> {
   await connectDB();
-  const accessFilter = { $or: [{ owner: user.id }, { members: user.email }] };
+  const accessFilter = { $or: [{ owner: user.id }, { members: user.email }], deletedAt: null };
   const [boards, projects, notes] = await Promise.all([
     Board.find(accessFilter).select('owner members').lean(),
     Project.find(accessFilter).select('owner members').lean(),

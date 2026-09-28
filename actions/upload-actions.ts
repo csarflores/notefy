@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto';
 import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { revalidatePath } from 'next/cache';
-import { getAuthUser, findAccessibleTask, isOwner, AuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, findEditableTask, isOwner, AuthUser } from '@/lib/auth-helpers';
 import { getS3Client, S3_BUCKET, S3_KEY_PREFIX, CLOUDFRONT_URL } from '@/lib/s3';
 import connectDB from '@/lib/mongodb';
 import Board from '@/models/Board';
@@ -109,7 +109,7 @@ export async function getPresignedUploadUrl(input: {
       if (!resourceId || !isValidObjectId(resourceId)) {
         return { success: false, error: 'Recurso inválido' };
       }
-      const task = await findAccessibleTask(resourceId, user);
+      const task = await findEditableTask(resourceId, user);
       if (!task) {
         return { success: false, error: 'Tarea no encontrada o sin permisos' };
       }
@@ -143,7 +143,7 @@ export async function setTaskCover(taskId: string, key: string): Promise<ApiResp
       return { success: false, error: 'Archivo inválido' };
     }
 
-    const task = await findAccessibleTask(taskId, user);
+    const task = await findEditableTask(taskId, user);
     if (!task) {
       return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
@@ -173,7 +173,7 @@ export async function clearTaskCover(taskId: string): Promise<ApiResponse<null>>
       return { success: false, error: 'No autenticado' };
     }
 
-    const task = await findAccessibleTask(taskId, user);
+    const task = await findEditableTask(taskId, user);
     if (!task) {
       return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
@@ -273,7 +273,7 @@ export async function addTaskAttachment(
       return { success: false, error: 'Metadatos de archivo inválidos' };
     }
 
-    const task = await findAccessibleTask(taskId, user);
+    const task = await findEditableTask(taskId, user);
     if (!task) {
       return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }
@@ -316,7 +316,7 @@ export async function removeTaskAttachment(
       return { success: false, error: 'Adjunto inválido' };
     }
 
-    const task = await findAccessibleTask(taskId, user);
+    const task = await findEditableTask(taskId, user);
     if (!task) {
       return { success: false, error: 'Tarea no encontrada o sin permisos' };
     }

@@ -11,9 +11,10 @@ interface BoardsListClientProps {
   projectId: string;
   userId: string;
   boards: IBoard[];
+  favorites?: string[];
 }
 
-export default function BoardsListClient({ projectId, userId, boards }: BoardsListClientProps) {
+export default function BoardsListClient({ projectId, userId, boards, favorites = [] }: BoardsListClientProps) {
   const router = useRouter();
   const { showNotification } = useNotification();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -75,7 +76,8 @@ export default function BoardsListClient({ projectId, userId, boards }: BoardsLi
           onDragStart={handleBoardDragStart}
           onDragEnd={handleBoardDragEnd}
           onDrop={handleBoardReorder}
-          isDragOver={draggedBoard?.id === board._id.toString()}
+          dragOverCompatible={!!draggedBoard && draggedBoard.id !== board._id.toString()}
+          isFavorite={favorites.includes(`board:${board._id.toString()}`)}
         />
       ))}
     </div>

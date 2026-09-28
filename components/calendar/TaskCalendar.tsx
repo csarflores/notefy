@@ -8,6 +8,7 @@ import type { EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAnd
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ITask } from '@/types';
+import { isTaskDone } from '@/lib/board-columns';
 import CalendarFilters, { CalendarFilters as CalendarFiltersType, FilterOption } from './CalendarFilters';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -74,6 +75,8 @@ interface TaskCalendarProps {
   onTaskClick?: (task: ITask) => void;
   onEventDrop?: (task: ITask, newDate: Date) => void;
   hideProjectFilter?: boolean;
+  /** Si es false, los eventos no se pueden arrastrar (usuarios sin permiso de edición) */
+  canDrag?: boolean;
 }
 
 const hexToRgb = (hex: string) => {
@@ -83,7 +86,7 @@ const hexToRgb = (hex: string) => {
     : null;
 };
 
-export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProjectFilter = false }: TaskCalendarProps) {
+export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProjectFilter = false, canDrag = true }: TaskCalendarProps) {
   const router = useRouter();
   const [view, setView] = useState<View>(Views.MONTH);
   const [date, setDate] = useState(new Date());
@@ -229,7 +232,7 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
     const task = event.resource;
     if (!task) return null;
     const boardColor = getBoard(task)?.color || '#6b7280';
-    const isDone = task.status === 'done';
+    const isDone = isTaskDone(task);
     return (
       <div className="cal-event-pill" title={task.title}>
         <span className="cal-event-dot" style={{ backgroundColor: boardColor }} />
@@ -247,7 +250,7 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
     const boardName = board?.name || 'Sin tablero';
     const rgb = hexToRgb(boardColor);
     const bg = rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},0.08)` : 'rgba(107,114,128,0.08)';
-    const isDone = task.status === 'done';
+    const isDone = isTaskDone(task);
     return (
       <div
         className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
@@ -280,7 +283,7 @@ export default function TaskCalendar({ tasks, onTaskClick, onEventDrop, hideProj
         }}
         onSelectEvent={handleEventClick}
         onEventDrop={handleEventDrop}
-        draggableAccessor={() => true}
+        draggableAccessor={() => canDrag}
         resizable={false}
         selectable
         culture="es"

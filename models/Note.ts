@@ -37,6 +37,21 @@ const NoteSchema = new Schema<INote>(
         message: 'Todos los miembros deben tener emails válidos',
       },
     },
+    memberRoles: {
+      type: Map,
+      of: { type: String, enum: ['viewer', 'commenter', 'editor'] },
+      default: {},
+    },
+    publicToken: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    linkedNotes: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Note',
+      default: [],
+    },
     projectId: {
       type: Schema.Types.ObjectId,
       ref: 'Project',
@@ -51,6 +66,10 @@ const NoteSchema = new Schema<INote>(
         },
         message: 'El color debe ser un código hexadecimal válido (ej: #f59e0b)',
       },
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

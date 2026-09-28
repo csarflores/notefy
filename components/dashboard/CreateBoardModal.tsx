@@ -4,7 +4,7 @@ import { useState, FormEvent, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
-import { createBoard } from '@/actions/board-actions';
+import { createBoard, createBoardFromTemplate } from '@/actions/board-actions';
 import { getUserProjects } from '@/actions/project-actions';
 import { IProject } from '@/types';
 import { useSession } from 'next-auth/react';
@@ -30,6 +30,7 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [error, setError] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [template, setTemplate] = useState<'none' | 'sprint' | 'personal' | 'client'>('none');
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -70,12 +71,15 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
     setIsLoading(true);
 
     try {
-      const result = await createBoard(userId, {
+      const input = {
         name: name.trim(),
         description: description.trim(),
         color: color,
         projectId: selectedProjectId,
-      });
+      };
+      const result = template === 'none'
+        ? await createBoard(userId, input)
+        : await createBoardFromTemplate(userId, input, template);
 
       if (result.success) {
         onClose();
@@ -97,6 +101,7 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
       setDescription('');
       setColor('#6b7280');
       setShowColorPicker(false);
+      setTemplate('none');
       onClose();
     }
   };
@@ -190,6 +195,40 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
               </div>
             )}
           </div>
+        </div>
+
+        {/* Plantilla */}
+        <div>
+          <label className="block text-sm font-medium text-[#1d1d1f] mb-2">
+            Plantilla
+          </label>
+          <div className="flex gap-1.5">
+            {([
+              { id: 'none', label: 'Vacío' },
+              { id: 'sprint', label: 'Sprint' },
+              { id: 'personal', label: 'Personal' },
+              { id: 'client', label: 'Cliente' },
+            ] as const).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTemplate(t.id)}
+                disabled={isLoading}
+                className={`flex-1 px-3 py-2 rounded-lg text-[12px] font-medium transition-all ${
+                  template === t.id
+                    ? 'bg-[#e8f0fb] text-[#0055aa] ring-1 ring-[#0066cc]/25'
+                    : 'text-[#8e8e93] hover:bg-[#f5f5f7] border border-[#e5e5ea]'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {template !== 'none' && (
+            <p className="text-[11px] text-[#a0a0a8] mt-1.5">
+              Se crearán tareas de ejemplo en el tablero
+            </p>
+          )}
         </div>
 
         <div>

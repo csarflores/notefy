@@ -3,7 +3,7 @@
 ## Estructura de Carpetas (Next.js 15 App Router)
 
 ```
-notefy/
+harold/
 ├── app/                          # Next.js 15 App Router
 │   ├── layout.tsx               # Layout raíz con providers
 │   ├── page.tsx                 # Página principal (redirige a login/dashboard)
@@ -38,7 +38,7 @@ notefy/
 │   ├── kanban/                  # KanbanBoard, TaskCard, modales, filtros, tags
 │   ├── notes/                   # NoteCard, NoteEditor (TipTap), modales
 │   ├── calendar/                # TaskCalendar, filtros, UpcomingTasks
-│   ├── project/                 # InviteMemberModal
+│   ├── share/                   # ShareDialog (compartir proyectos/tableros/notas)
 │   ├── layout/                  # AppShell, Sidebar, CommandPalette, recents
 │   ├── tabs/                    # Sistema de pestañas (TabContext, TabBar, TabSyncer)
 │   └── ui/                      # Primitivas: Button, Card, Modal, Avatar, Badge, etc.
@@ -67,6 +67,8 @@ notefy/
 ├── types/                       # Tipos TypeScript compartidos
 │   ├── index.ts                # Definiciones de tipos principales
 │   └── next-auth.d.ts          # Tipos de NextAuth
+├── public/                      # Assets estáticos servidos en / (íconos, manifest.json)
+├── brand/                       # Fuentes de marca (SVG/AI/EPS maestros, guía de estilo)
 ├── middleware.ts                # Protección de rutas (next-auth middleware)
 └── .ai/                         # Documentación para IA
     ├── AGENTS.md               # Reglas de Next.js 15

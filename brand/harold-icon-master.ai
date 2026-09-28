@@ -1,0 +1,19 @@
+%!PS-Adobe-3.0 EPSF-3.0
+%%Creator: Harold Brand System
+%%Title: Harold Glasses Icon
+%%BoundingBox: 0 0 1000 1000
+%%LanguageLevel: 3
+%%Pages: 1
+%%EndComments
+/blue { 0 0.4 0.8 setrgbcolor } def
+blue
+72 setlinewidth
+1 setlinecap
+1 setlinejoin
+newpath 320 500 205 0 360 arc stroke
+newpath 680 500 205 0 360 arc stroke
+newpath 525 500 moveto 595 500 lineto stroke
+newpath 115 500 moveto 70 500 lineto stroke
+newpath 885 500 moveto 930 500 lineto stroke
+showpage
+%%EOF

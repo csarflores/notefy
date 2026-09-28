@@ -63,8 +63,17 @@ export default function ProjectWithFilters({
       });
     }
 
-    if (currentFilter === 'todo' || currentFilter === 'in-progress' || currentFilter === 'done') {
-      return tasks.filter(task => task.status === currentFilter);
+    if (currentFilter.startsWith('col:')) {
+      const columnId = currentFilter.slice(4);
+      return tasks.filter(task => task.status === columnId);
+    }
+
+    // Filtro por prioridad
+    if (currentFilter.startsWith('priority:')) {
+      const p = currentFilter.split(':')[1];
+      return tasks.filter((task) =>
+        p === 'none' ? !task.priority : task.priority === p
+      );
     }
 
     // Verificar si es un filtro por etiqueta

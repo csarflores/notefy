@@ -2,14 +2,16 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useUpload } from '@/hooks/useUpload';
 import { setUserAvatar, removeUserAvatar } from '@/actions/upload-actions';
-import { updateUserProfile } from '@/actions/user-actions';
+import { updateUserProfile, changePassword, deleteAccount } from '@/actions/user-actions';
 import { useNotification } from '@/components/ui/NotificationContext';
-import { Camera, Trash2 } from 'lucide-react';
+import ThemeToggle from '@/components/ui/ThemeToggle';
+import { Camera, Trash2, KeyRound, AlertTriangle } from 'lucide-react';
 import { IUser } from '@/types';
 
 export default function SettingsClient({ user }: { user: IUser }) {
@@ -22,6 +24,15 @@ export default function SettingsClient({ user }: { user: IUser }) {
   const [name, setName] = useState(user.name);
   const [avatarUrl, setAvatarUrl] = useState(user.image || '');
   const [isSaving, setIsSaving] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,6 +91,49 @@ export default function SettingsClient({ user }: { user: IUser }) {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      showNotification('Las contraseñas nuevas no coinciden', 'error');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      const result = await changePassword(currentPassword, newPassword);
+      if (result.success) {
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        showNotification('Contraseña actualizada', 'success');
+      } else {
+        showNotification(result.error || 'Error al cambiar la contraseña', 'error');
+      }
+    } catch {
+      showNotification('Error inesperado al cambiar la contraseña', 'error');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const result = await deleteAccount(deletePassword);
+      if (result.success) {
+        showNotification('Cuenta eliminada', 'success');
+        await signOut({ callbackUrl: '/auth/login' });
+      } else {
+        setShowDeleteDialog(false);
+        setDeletePassword('');
+        showNotification(result.error || 'Error al eliminar la cuenta', 'error');
+      }
+    } catch {
+      setShowDeleteDialog(false);
+      showNotification('Error inesperado al eliminar la cuenta', 'error');
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Foto de perfil */}
@@ -129,6 +183,15 @@ export default function SettingsClient({ user }: { user: IUser }) {
         </div>
       </section>
 
+      {/* Apariencia */}
+      <section className="bg-white rounded-xl border border-[#e0e0e0] p-5 sm:p-6">
+        <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-1">Apariencia</h2>
+        <p className="text-[12px] text-[#7a7a7a] mb-4">
+          Elige entre modo claro, oscuro o el tema de tu sistema.
+        </p>
+        <ThemeToggle />
+      </section>
+
       {/* Datos personales */}
       <section className="bg-white rounded-xl border border-[#e0e0e0] p-5 sm:p-6">
         <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-4">Datos personales</h2>
@@ -171,6 +234,129 @@ export default function SettingsClient({ user }: { user: IUser }) {
           </div>
         </div>
       </section>
+
+      {/* Contraseña */}
+      <section className="bg-white rounded-xl border border-[#e0e0e0] p-5 sm:p-6">
+        <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-1 flex items-center gap-2">
+          <KeyRound size={15} className="text-[#7a7a7a]" />
+          Contraseña
+        </h2>
+        <p className="text-[12px] text-[#7a7a7a] mb-4">
+          Cambiá tu contraseña de acceso. Mínimo 8 caracteres.
+        </p>
+        <div className="space-y-3 max-w-sm">
+          <div>
+            <label
+              htmlFor="currentPassword"
+              className="block text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-1.5"
+            >
+              Contraseña actual
+            </label>
+            <input
+              id="currentPassword"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
+              className="w-full px-3 py-2 rounded-lg border border-[#e5e5ea] focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/10 outline-none transition-all text-[13px] text-[#1d1d1f] bg-white"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="newPassword"
+              className="block text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-1.5"
+            >
+              Nueva contraseña
+            </label>
+            <input
+              id="newPassword"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+              className="w-full px-3 py-2 rounded-lg border border-[#e5e5ea] focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/10 outline-none transition-all text-[13px] text-[#1d1d1f] bg-white"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="confirmPassword"
+              className="block text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-1.5"
+            >
+              Confirmar nueva contraseña
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+              className="w-full px-3 py-2 rounded-lg border border-[#e5e5ea] focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/10 outline-none transition-all text-[13px] text-[#1d1d1f] bg-white"
+            />
+          </div>
+          <Button
+            onClick={handleChangePassword}
+            disabled={isChangingPassword || !newPassword || newPassword.length < 8}
+            size="sm"
+            isLoading={isChangingPassword}
+          >
+            Cambiar contraseña
+          </Button>
+        </div>
+      </section>
+
+      {/* Zona de peligro */}
+      <section className="bg-white rounded-xl border border-red-200 p-5 sm:p-6">
+        <h2 className="text-[15px] font-semibold text-red-600 mb-1 flex items-center gap-2">
+          <AlertTriangle size={15} />
+          Zona de peligro
+        </h2>
+        <p className="text-[12px] text-[#7a7a7a] mb-4">
+          Eliminar tu cuenta borra permanentemente tus proyectos, tableros, tareas y notas.
+          También te quita como miembro de los recursos compartidos con vos.
+        </p>
+        <Button
+          onClick={() => setShowDeleteDialog(true)}
+          size="sm"
+          className="bg-red-500 hover:bg-red-600"
+        >
+          Eliminar cuenta
+        </Button>
+      </section>
+
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => { setShowDeleteDialog(false); setDeletePassword(''); }}
+        onConfirm={handleDeleteAccount}
+        title="Eliminar cuenta"
+        message={
+          <div className="space-y-3 text-left">
+            <p className="text-sm text-[#7a7a7a]">
+              Esta acción es <strong className="text-red-500">permanente</strong> y no se puede deshacer.
+              Se eliminarán todos tus proyectos, tableros, tareas y notas.
+            </p>
+            <div>
+              <label
+                htmlFor="deletePassword"
+                className="block text-[10px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-1.5"
+              >
+                Confirmá con tu contraseña
+              </label>
+              <input
+                id="deletePassword"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                autoComplete="current-password"
+                className="w-full px-3 py-2 rounded-lg border border-[#e5e5ea] focus:border-red-400 focus:ring-2 focus:ring-red-400/10 outline-none transition-all text-[13px] text-[#1d1d1f] bg-white"
+              />
+            </div>
+          </div>
+        }
+        confirmText="Eliminar definitivamente"
+        isLoading={isDeletingAccount}
+        variant="danger"
+      />
     </div>
   );
 }

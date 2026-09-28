@@ -1,9 +1,10 @@
 'use client';
 
-import { Fragment, ReactNode } from 'react';
+import { Fragment, ReactNode, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { overlayStack } from './overlay-stack';
 
 interface ModalProps {
   isOpen: boolean;
@@ -15,6 +16,26 @@ interface ModalProps {
 }
 
 export default function Modal({ isOpen, onClose, title, children, className, headerContent }: ModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const id = Symbol('modal');
+    overlayStack.push(id);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && overlayStack[overlayStack.length - 1] === id) {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      const idx = overlayStack.indexOf(id);
+      if (idx !== -1) overlayStack.splice(idx, 1);
+      document.removeEventListener('keydown', onKeyDown);
+      if (overlayStack.length === 0) document.body.style.overflow = '';
+    };
+  }, [isOpen, onClose]);
   return (
     <AnimatePresence>
       {isOpen && (
@@ -25,7 +46,11 @@ export default function Modal({ isOpen, onClose, title, children, className, hea
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            onClick={onClose}
+            onClick={(e) => {
+              // El segundo clic de un doble-clic cae sobre el backdrop recién abierto
+              if (e.detail > 1) return;
+              onClose();
+            }}
             className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-50"
           />
 

@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { ITask } from '@/types';
 import TaskCalendar from '@/components/calendar/TaskCalendar';
 import UpcomingTasks from '@/components/calendar/UpcomingTasks';
-import EditTaskModal from '@/components/kanban/EditTaskModal';
+import TaskDetailPanel from '@/components/kanban/TaskDetailPanel';
 import { Calendar, Clock, AlertCircle } from 'lucide-react';
 import { updateTaskDeliveryDate } from '@/actions/calendar-actions';
+import { getMyTaskPermissions } from '@/actions/task-actions';
 
 interface CalendarClientProps {
   initialTasks: ITask[];
@@ -19,10 +20,16 @@ export default function CalendarClient({ initialTasks, upcomingTasks, overdueTas
   const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'calendar' | 'upcoming' | 'overdue'>('calendar');
+  const [taskPerms, setTaskPerms] = useState({ canEdit: false, canComment: false });
 
-  const handleTaskClick = (task: ITask) => {
+  const handleTaskClick = async (task: ITask) => {
+    setTaskPerms({ canEdit: false, canComment: false });
     setSelectedTask(task);
     setShowEditModal(true);
+    const result = await getMyTaskPermissions(task._id.toString());
+    if (result.success && result.data) {
+      setTaskPerms(result.data);
+    }
   };
 
   const handleEventDrop = async (task: ITask, newDate: Date) => {
@@ -116,15 +123,17 @@ export default function CalendarClient({ initialTasks, upcomingTasks, overdueTas
         />
       )}
 
-      {/* Modal de edición de tarea */}
+      {/* Panel de edición de tarea */}
       {selectedTask && (
-        <EditTaskModal
+        <TaskDetailPanel
           isOpen={showEditModal}
           onClose={() => {
             setShowEditModal(false);
             setSelectedTask(null);
           }}
           task={selectedTask}
+          canEdit={taskPerms.canEdit}
+          canComment={taskPerms.canComment}
         />
       )}
     </div>

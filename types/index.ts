@@ -9,9 +9,19 @@ export interface IUser extends Document {
   image?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  favorites: string[];
+  emailVerified?: Date | null;
+  verifyEmailToken?: string;
+  verifyEmailExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Rol de un miembro en un recurso compartido
+export type MemberRole = 'viewer' | 'commenter' | 'editor';
+
+// Tipo de recurso compartible
+export type ResourceType = 'project' | 'board' | 'note';
 
 // Tipos para Project (agrupa tableros, no tiene tareas directamente)
 export interface IProject extends Document {
@@ -20,7 +30,9 @@ export interface IProject extends Document {
   description?: string;
   owner: Types.ObjectId;
   members: string[];
+  memberRoles?: Types.Map<MemberRole>;
   color: string;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,12 +44,22 @@ export interface IBoard extends Document {
   description?: string;
   owner: Types.ObjectId;
   members: string[];
+  memberRoles?: Types.Map<MemberRole>;
   tags: ITag[];
   projectId?: Types.ObjectId | null;
   color: string;
   order: number;
+  columns?: IBoardColumn[];
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Columna personalizable de un tablero kanban
+export interface IBoardColumn {
+  id: string;
+  title: string;
+  color: string;
 }
 
 // Tipos para Tag
@@ -79,12 +101,22 @@ export interface IComment {
   createdAt: Date;
 }
 
+// Tipos para Checklist item (subtarea dentro de una Task)
+export interface IChecklistItem {
+  _id: Types.ObjectId;
+  text: string;
+  done: boolean;
+}
+
+export type TaskPriority = 'low' | 'medium' | 'high';
+
 // Tipos para Task
 export interface ITask extends Document {
   _id: Types.ObjectId;
   title: string;
   description?: string;
-  status: 'todo' | 'in-progress' | 'done';
+  // ID de la columna del tablero ('todo'|'in-progress'|'done' o columna personalizada)
+  status: string;
   boardId: Types.ObjectId;
   createdBy?: Types.ObjectId | null;
   assignedTo: Types.ObjectId[];
@@ -92,9 +124,13 @@ export interface ITask extends Document {
   attachments?: ITaskAttachment[];
   tags: ITag[];
   comments: IComment[];
+  checklist?: IChecklistItem[];
+  priority?: TaskPriority;
   order: number;
   dueDate?: Date | null;
   deliveryDate?: Date | null;
+  reminderSentFor?: Date | null;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -107,10 +143,41 @@ export interface INote extends Document {
   visibility: 'private' | 'shared';
   owner: Types.ObjectId;
   members: string[];
+  memberRoles?: Types.Map<MemberRole>;
+  publicToken?: string | null;
+  linkedNotes?: Types.ObjectId[];
   projectId?: Types.ObjectId | null;
   color: string;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Tipos para Notification
+export interface INotification extends Document {
+  _id: Types.ObjectId;
+  user: Types.ObjectId;
+  type: 'assigned' | 'comment' | 'reply' | 'mention' | 'invite' | 'member' | 'reminder';
+  message: string;
+  link?: string;
+  read: boolean;
+  createdAt: Date;
+}
+
+// Tipos para Invitation (invitaciones pendientes por email)
+export interface IInvitation extends Document {
+  _id: Types.ObjectId;
+  email: string;
+  resourceType: 'project' | 'board' | 'note';
+  resourceId: Types.ObjectId;
+  resourceName: string;
+  invitedBy: Types.ObjectId;
+  invitedByName: string;
+  role: MemberRole;
+  token: string;
+  status: 'pending' | 'accepted' | 'declined';
+  expiresAt: Date;
+  createdAt: Date;
 }
 
 // Tipos para respuestas de API
@@ -148,10 +215,12 @@ export type CreateTaskInput = {
   title: string;
   description?: string;
   boardId: string;
-  status?: 'todo' | 'in-progress' | 'done';
+  status?: string;
   assignedTo?: string[];
   tags?: ITag[];
   imageUrl?: string;
+  priority?: TaskPriority | null;
+  checklist?: { _id?: string; text: string; done: boolean }[];
   dueDate?: string | null;
   deliveryDate?: string | null;
 };

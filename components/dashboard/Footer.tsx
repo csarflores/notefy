@@ -6,7 +6,7 @@ const Footer = () => {
             <div className="container mx-auto px-4">
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-center">
                     <div className="flex items-center gap-2 text-[#6b7280] text-sm">
-                        <span className="font-medium">© {new Date().getFullYear()} Notefy</span>
+                        <span className="font-medium">© {new Date().getFullYear()} Harold</span>
                     </div>
                     
                     <div className="flex items-center gap-2 text-xs">
@@ -16,7 +16,7 @@ const Footer = () => {
                     </div>
                     
                     <a
-                        href="https://github.com/csarflores/notefy"
+                        href="https://github.com/csarflores/harold"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-[#e5e7eb] hover:bg-[#f9fafb] hover:border-[#d1d5db] transition-all duration-200 text-[#374151] text-sm font-medium"

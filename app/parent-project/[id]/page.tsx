@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getProjectById, getProjectUsers } from "@/actions/project-actions";
 import { getProjectBoards } from "@/actions/board-actions";
 import { getProjectNotes } from "@/actions/note-actions";
+import { getUserFavorites } from "@/actions/favorite-actions";
 import { getUsersByIds } from "@/actions/user-actions";
 import BoardsListClient from "./BoardsListClient";
 import ParentProjectClient from "./ParentProjectClient";
@@ -16,6 +17,7 @@ import {
 import ProjectNotesClient from "./ProjectNotesClient";
 import ProjectCalendarClient from "./ProjectCalendarClient";
 import TabSyncer from "@/components/tabs/TabSyncer";
+import { MemberRole } from "@/types";
 
 async function BoardsList({
   projectId,
@@ -24,7 +26,11 @@ async function BoardsList({
   projectId: string;
   userId: string;
 }) {
-  const result = await getProjectBoards(projectId, userId);
+  const [result, favoritesResult] = await Promise.all([
+    getProjectBoards(projectId, userId),
+    getUserFavorites(),
+  ]);
+  const favorites = favoritesResult.success ? (favoritesResult.data || []) : [];
 
   if (!result.success || !result.data) {
     return (
@@ -56,7 +62,7 @@ async function BoardsList({
   }
 
   return (
-    <BoardsListClient projectId={projectId} userId={userId} boards={boards} />
+    <BoardsListClient projectId={projectId} userId={userId} boards={boards} favorites={favorites} />
   );
 }
 
@@ -67,7 +73,11 @@ async function NotesList({
   projectId: string;
   userId: string;
 }) {
-  const result = await getProjectNotes(projectId, userId);
+  const [result, favoritesResult] = await Promise.all([
+    getProjectNotes(projectId, userId),
+    getUserFavorites(),
+  ]);
+  const favorites = favoritesResult.success ? (favoritesResult.data || []) : [];
 
   if (!result.success || !result.data) {
     return (
@@ -103,7 +113,7 @@ async function NotesList({
     };
   });
 
-  return <ProjectNotesClient notes={notesWithOwnerInfo} userId={userId} />;
+  return <ProjectNotesClient notes={notesWithOwnerInfo} userId={userId} favorites={favorites} />;
 }
 
 function BoardsLoading() {
@@ -156,6 +166,16 @@ export default async function ProjectPage({
 
   const isOwner = project.owner.toString() === session.user.id;
 
+  // Rol del usuario sobre el proyecto (memberRoles llega serializado como objeto plano)
+  const memberRoles = (project.memberRoles ?? {}) as unknown as Record<string, MemberRole>;
+  const sessionEmail = session.user.email?.toLowerCase() ?? "";
+  const myRole: MemberRole | "owner" | null = isOwner
+    ? "owner"
+    : project.members?.includes(sessionEmail)
+      ? (memberRoles[sessionEmail] ?? "editor")
+      : null;
+  const canEditProject = myRole === "owner" || myRole === "editor";
+
   return (
     <div className="w-full min-h-full">
       <TabSyncer
@@ -199,24 +219,23 @@ export default async function ProjectPage({
               </span>
             ))}
           </span>
-          {isOwner && (
-            <ParentProjectClient
-              userId={session.user.id}
-              parentId={id}
-              project={project}
-              mode="share"
-              ownerEmail={session.user.email}
-              ownerName={session.user.name}
-            />
-          )}
+          <ParentProjectClient
+            userId={session.user.id}
+            parentId={id}
+            project={project}
+            mode="share"
+            ownerEmail={session.user.email}
+            ownerName={session.user.name}
+          />
         </div>
 
-        {/* Botón de crear tablero */}
+        {/* Botón de crear tablero (requiere permisos de edición) */}
         <ParentProjectClient
           userId={session.user.id}
           parentId={id}
           ownerEmail={session.user.email}
           ownerName={session.user.name}
+          canEdit={canEditProject}
         />
 
         {/* Lista de tableros */}
@@ -241,6 +260,7 @@ export default async function ProjectPage({
               mode="note"
               ownerEmail={session.user.email}
               ownerName={session.user.name}
+              canEdit={canEditProject}
             />
           </div>
           <Suspense fallback={<BoardsLoading />}>

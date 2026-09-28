@@ -22,6 +22,9 @@ import {
   Trash2,
   ExternalLink,
   X,
+  Keyboard,
+  Star,
+  Copy,
 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logotipo';
 import { useSidebar } from './SidebarContext';
@@ -30,15 +33,20 @@ import { useTabContext } from '@/components/tabs/TabContext';
 import { getUserProjects, deleteProject } from '@/actions/project-actions';
 import { getUserBoards, deleteBoard } from '@/actions/board-actions';
 import { getUserNotes, deleteNote } from '@/actions/note-actions';
+import { getUserFavorites, toggleFavorite, FavoriteKind } from '@/actions/favorite-actions';
+import { getOverdueTasks } from '@/actions/calendar-actions';
+import { duplicateBoard } from '@/actions/board-actions';
 import { IProject, IBoard, INote } from '@/types';
 import CreateProjectGroupModal from '@/components/dashboard/CreateProjectGroupModal';
 import CreateBoardModal from '@/components/dashboard/CreateBoardModal';
 import CreateNoteModal from '@/components/notes/CreateNoteModal';
 import EditProjectModal from '@/components/dashboard/EditProjectModal';
 import EditBoardModal from '@/components/dashboard/EditBoardModal';
-import ConfirmModal from '@/components/ui/ConfirmModal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import ShortcutsModal from '@/components/ui/ShortcutsModal';
 import SidebarContextMenu, { ContextMenuItem } from './SidebarContextMenu';
 import { useRecents, RecentItem } from './useRecents';
+import { useNotification } from '@/components/ui/NotificationContext';
 
 interface SidebarProps {
   userId: string;
@@ -52,9 +60,19 @@ interface ProjectTree {
   expanded: boolean;
 }
 
+interface FavoriteEntry {
+  key: string;
+  type: 'project' | 'board' | 'note';
+  title: string;
+  url: string;
+  tabId: string;
+  resourceId: string;
+}
+
 export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
-  const { collapsed, toggle } = useSidebar();
+  const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebar();
   const { open: openSearch } = useCommandPalette();
+  const { showNotification } = useNotification();
   const router = useRouter();
   const pathname = usePathname();
   const { openTab } = useTabContext();
@@ -63,6 +81,9 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
   const [standaloneBoards, setStandaloneBoards] = useState<IBoard[]>([]);
   const [standaloneNotes, setStandaloneNotes] = useState<INote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [favoriteItems, setFavoriteItems] = useState<FavoriteEntry[]>([]);
+  const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [recentsExpanded, setRecentsExpanded] = useState(true);
   const { recents, push: pushRecent, remove: removeRecent } = useRecents();
 
@@ -83,6 +104,15 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
     title: string;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [overdueCount, setOverdueCount] = useState(0);
+
+  // Badge de tareas vencidas en el item Calendario
+  useEffect(() => {
+    getOverdueTasks(userId).then((result) => {
+      if (result.success && result.data) setOverdueCount(result.data.length);
+    });
+  }, [userId]);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -106,7 +136,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
       else if (confirmDelete.type === 'board') result = await deleteBoard(confirmDelete.id);
       else if (confirmDelete.type === 'note') result = await deleteNote(confirmDelete.id, userId);
       if (result && !result.success) {
-        window.alert(result.error || 'No se pudo eliminar');
+        showNotification(result.error || 'No se pudo eliminar', 'error');
       }
       await loadData();
     } finally {
@@ -116,30 +146,88 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
   };
 
   const loadData = useCallback(async () => {
-    const [projectsRes, boardsRes, notesRes] = await Promise.all([
+    const [projectsRes, boardsRes, notesRes, favsRes] = await Promise.all([
       getUserProjects(userId),
       getUserBoards(userId),
       getUserNotes(userId),
+      getUserFavorites(),
     ]);
     if (!projectsRes.success || !boardsRes.success) return;
 
     const projects = projectsRes.data || [];
     const boards = boardsRes.data || [];
     const notes = notesRes.success ? (notesRes.data || []) : [];
+    const favKeys = favsRes.success && favsRes.data ? favsRes.data : [];
+    setFavorites(favKeys);
 
-    const tree: ProjectTree[] = projects.map((p) => ({
+    // Resolver favoritos a items navegables
+    const entries: FavoriteEntry[] = [];
+    for (const key of favKeys) {
+      const sep = key.indexOf(':');
+      const kind = key.slice(0, sep);
+      const id = key.slice(sep + 1);
+      if (kind === 'project') {
+        const p = projects.find((x) => x._id.toString() === id);
+        if (p) entries.push({ key, type: 'project', title: p.name, url: `/parent-project/${id}`, tabId: `project-${id}`, resourceId: id });
+      } else if (kind === 'board') {
+        const b = boards.find((x) => x._id.toString() === id);
+        if (b) entries.push({ key, type: 'board', title: b.name, url: `/board/${id}`, tabId: `board-${id}`, resourceId: id });
+      } else if (kind === 'note') {
+        const n = notes.find((x) => x._id.toString() === id);
+        if (n) entries.push({ key, type: 'note', title: n.title, url: `/notes/${id}`, tabId: `note-${id}`, resourceId: id });
+      }
+    }
+    setFavoriteItems(entries);
+
+    const fav = (key: string) => (favsRes.data || []).includes(key);
+    const sortFav = <T extends { _id: { toString(): string } }>(arr: T[], kind: string) =>
+      [...arr].sort((a, b) => Number(fav(`${kind}:${b._id.toString()}`)) - Number(fav(`${kind}:${a._id.toString()}`)));
+
+    const sortedProjects = sortFav(projects, 'project');
+    const tree: ProjectTree[] = sortedProjects.map((p) => ({
       project: p,
-      boards: boards.filter((b) => b.projectId?.toString() === p._id.toString()),
+      boards: sortFav(boards.filter((b) => b.projectId?.toString() === p._id.toString()), 'board'),
       expanded: true,
     }));
 
     setProjectTree(tree);
-    setStandaloneBoards(boards.filter((b) => !b.projectId));
-    setStandaloneNotes(notes.filter((n) => !n.projectId));
+    setStandaloneBoards(sortFav(boards.filter((b) => !b.projectId), 'board'));
+    setStandaloneNotes(sortFav(notes.filter((n) => !n.projectId), 'note'));
     setLoading(false);
   }, [userId]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Recargar al navegar (los datos pueden haber cambiado en otra vista)
+  // y al volver el foco a la ventana
+  useEffect(() => { loadData(); }, [loadData, pathname]);
+
+  // Cerrar el drawer móvil al navegar
+  useEffect(() => { setMobileOpen(false); }, [pathname, setMobileOpen]);
+
+  useEffect(() => {
+    const onFocus = () => loadData();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadData]);
+
+  const handleToggleFavorite = async (kind: FavoriteKind, id: string) => {
+    const key = `${kind}:${id}`;
+    setFavorites((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]));
+    const res = await toggleFavorite(kind, id);
+    if (!res.success) {
+      showNotification('Error al actualizar favorito', 'error');
+    }
+    await loadData();
+  };
+
+  const handleDuplicateBoard = async (boardId: string) => {
+    const res = await duplicateBoard(boardId);
+    if (res.success) {
+      showNotification('Tablero duplicado', 'success');
+      await loadData();
+    } else {
+      showNotification(res.error || 'Error al duplicar el tablero', 'error');
+    }
+  };
 
   const toggleProject = (id: string) => {
     setProjectTree((prev) =>
@@ -153,10 +241,10 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
     openTab(tab);
     pushRecent({
       id: tab.id,
-      type: tab.type === 'calendar' ? 'board' : tab.type,
+      type: tab.type as RecentItem['type'],
       title: tab.title,
       url,
-    } as RecentItem);
+    });
     router.push(url);
   };
 
@@ -169,9 +257,10 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
         : 'text-[#5c5c5e] hover:bg-[#f0f0f2] hover:text-[#1d1d1f]'
     }`;
 
-  if (collapsed) {
+  // En móvil con el drawer abierto siempre se muestra el sidebar completo
+  if (collapsed && !mobileOpen) {
     return (
-      <div className="flex flex-col h-full w-14 bg-white border-r border-[#e0e0e0] shrink-0">
+      <div className="hidden md:flex flex-col h-full w-14 bg-white border-r border-[#e0e0e0] shrink-0">
         <div className="flex flex-col items-center py-3 gap-1">
           <button
             onClick={toggle}
@@ -190,8 +279,14 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
           <Link href="/dashboard" className="p-2 rounded-lg hover:bg-[#f0f0f2] transition-colors" title="Dashboard">
             <LayoutDashboard size={16} className="text-[#5c5c5e]" />
           </Link>
-          <Link href="/calendar" className="p-2 rounded-lg hover:bg-[#f0f0f2] transition-colors" title="Calendario">
+          <Link href="/calendar" className="relative p-2 rounded-lg hover:bg-[#f0f0f2] transition-colors" title={overdueCount > 0 ? `Calendario (${overdueCount} vencidas)` : 'Calendario'}>
             <CalendarDays size={16} className="text-[#5c5c5e]" />
+            {overdueCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[#e03131]" />
+            )}
+          </Link>
+          <Link href="/trash" className="p-2 rounded-lg hover:bg-[#f0f0f2] transition-colors" title="Papelera">
+            <Trash2 size={16} className="text-[#5c5c5e]" />
           </Link>
         </div>
         <div className="mt-auto flex flex-col items-center pb-3 gap-1">
@@ -205,7 +300,17 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
 
   return (
     <>
-      <div className="flex flex-col h-full w-60 bg-white border-r border-[#e0e0e0] shrink-0 overflow-hidden">
+      {/* Backdrop del drawer móvil */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[85] md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+      <div className={`flex flex-col h-full w-60 bg-white border-r border-[#e0e0e0] shrink-0 overflow-hidden
+        max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-[90] max-md:shadow-2xl
+        max-md:transition-transform max-md:duration-200 max-md:ease-out
+        ${mobileOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'}`}>
         {/* Top: Logo + collapse */}
         <div className="flex items-center justify-between px-3 py-3 border-b border-[#f0f0f2]">
           <Logo className="h-6 w-6" size="small" linkTo="/dashboard" />
@@ -250,7 +355,45 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
           >
             <CalendarDays size={14} className="shrink-0" />
             <span className="truncate">Calendario</span>
+            {overdueCount > 0 && (
+              <span className="ml-auto text-[10px] font-semibold text-[#e03131] bg-red-50 px-1.5 py-0.5 rounded-full shrink-0">
+                {overdueCount > 9 ? '9+' : overdueCount}
+              </span>
+            )}
           </button>
+
+          {/* Favorites section */}
+          {favoriteItems.length > 0 && (
+            <>
+              <div className="pt-2 pb-1 px-1">
+                <button
+                  onClick={() => setFavoritesExpanded((v) => !v)}
+                  className="flex items-center gap-1 w-full text-left hover:text-[#1d1d1f] transition-colors"
+                >
+                  {favoritesExpanded ? <ChevronDown size={11} className="text-[#a0a0a8]" /> : <ChevronRight size={11} className="text-[#a0a0a8]" />}
+                  <span className="text-[11px] font-semibold text-[#a0a0a8] uppercase tracking-wider">
+                    Favoritos
+                  </span>
+                </button>
+              </div>
+              {favoritesExpanded && favoriteItems.map((item) => {
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => navigate(item.url, { id: item.tabId, type: item.type, title: item.title, url: item.url, resourceId: item.resourceId })}
+                    onContextMenu={(e) => openContextMenu(e, [
+                      { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(item.url, { id: item.tabId, type: item.type, title: item.title, url: item.url, resourceId: item.resourceId }) },
+                      { label: 'Quitar de favoritos', icon: Star, onClick: () => handleToggleFavorite(item.type, item.resourceId), separator: true },
+                    ])}
+                    className={linkClass(item.url) + ' w-full text-left'}
+                  >
+                    <Star size={13} className="shrink-0 text-[#ff9500]" fill="currentColor" />
+                    <span className="truncate">{item.title}</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
 
           {/* Recents section */}
           {recents.length > 0 && (
@@ -267,13 +410,13 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                 </button>
               </div>
               {recentsExpanded && recents.map((item) => {
-                const Icon = item.type === 'project' ? Folder : item.type === 'note' ? FileText : LayoutGrid;
+                const Icon = item.type === 'project' ? Folder : item.type === 'note' ? FileText : item.type === 'calendar' ? CalendarDays : LayoutGrid;
                 return (
                   <button
                     key={item.id}
-                    onClick={() => router.push(item.url)}
+                    onClick={() => navigate(item.url, { id: item.id, type: item.type, title: item.title, url: item.url })}
                     onContextMenu={(e) => openContextMenu(e, [
-                      { label: 'Abrir', icon: ExternalLink, onClick: () => router.push(item.url) },
+                      { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(item.url, { id: item.id, type: item.type, title: item.title, url: item.url }) },
                       { label: 'Quitar de recientes', icon: X, onClick: () => removeRecent(item.id), separator: true },
                     ])}
                     className={linkClass(item.url) + ' w-full text-left'}
@@ -324,6 +467,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                         { label: 'Editar', icon: Pencil, onClick: () => setEditProject(project) },
                         { label: 'Nuevo tablero', icon: Plus, onClick: () => { setBoardModalProjectId(projectId); setBoardModal(true); } },
                         { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(projectUrl, { id: `project-${projectId}`, type: 'project', title: project.name, url: projectUrl, resourceId: projectId }) },
+                        { label: favorites.includes(`project:${projectId}`) ? 'Quitar de favoritos' : 'Marcar como favorito', icon: Star, onClick: () => handleToggleFavorite('project', projectId) },
                         ...(project.owner.toString() === userId ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'project', id: projectId, title: project.name }), variant: 'danger' as const, separator: true }] : []),
                       ])}
                       className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors cursor-pointer select-none ${
@@ -381,6 +525,8 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                               onContextMenu={(e) => openContextMenu(e, [
                                 { label: 'Editar', icon: Pencil, onClick: () => setEditBoard(board) },
                                 { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(boardUrl, boardTab) },
+                                { label: favorites.includes(`board:${board._id.toString()}`) ? 'Quitar de favoritos' : 'Marcar como favorito', icon: Star, onClick: () => handleToggleFavorite('board', board._id.toString()) },
+                                { label: 'Duplicar', icon: Copy, onClick: () => handleDuplicateBoard(board._id.toString()) },
                                 ...(board.owner.toString() === userId ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'board', id: board._id.toString(), title: board.name }), variant: 'danger' as const, separator: true }] : []),
                               ])}
                               className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[12px] transition-colors text-left ${
@@ -430,6 +576,8 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                         onContextMenu={(e) => openContextMenu(e, [
                           { label: 'Editar', icon: Pencil, onClick: () => setEditBoard(board) },
                           { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(boardUrl, boardTab) },
+                          { label: favorites.includes(`board:${board._id.toString()}`) ? 'Quitar de favoritos' : 'Marcar como favorito', icon: Star, onClick: () => handleToggleFavorite('board', board._id.toString()) },
+                          { label: 'Duplicar', icon: Copy, onClick: () => handleDuplicateBoard(board._id.toString()) },
                           ...(board.owner.toString() === userId ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'board', id: board._id.toString(), title: board.name }), variant: 'danger' as const, separator: true }] : []),
                         ])}
                         className={linkClass(boardUrl) + ' w-full text-left'}
@@ -454,7 +602,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
           )}         
 
           {/* Notes section */}
-          {!loading && (standaloneNotes.length > 0 || true) && (
+          {!loading && (
             <>
               <div className="pt-2 pb-1 px-1">
                 <div className="flex items-center justify-between">
@@ -472,7 +620,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
               </div>
               {standaloneNotes.map((note) => {
                 const noteUrl = `/notes/${note._id}`;
-                const noteTab = { id: `board-${note._id}`, type: 'board' as const, title: note.title, url: noteUrl, resourceId: note._id.toString() };
+                const noteTab = { id: `note-${note._id}`, type: 'note' as const, title: note.title, url: noteUrl, resourceId: note._id.toString() };
                 return (
                   <button
                     key={note._id.toString()}
@@ -480,6 +628,7 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                     onContextMenu={(e) => openContextMenu(e, [
                       { label: 'Editar', icon: Pencil, onClick: () => navigate(noteUrl, noteTab) },
                       { label: 'Abrir', icon: ExternalLink, onClick: () => navigate(noteUrl, noteTab) },
+                      { label: favorites.includes(`note:${note._id.toString()}`) ? 'Quitar de favoritos' : 'Marcar como favorito', icon: Star, onClick: () => handleToggleFavorite('note', note._id.toString()) },
                       ...(note.owner.toString() === userId ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setConfirmDelete({ type: 'note', id: note._id.toString(), title: note.title }), variant: 'danger' as const, separator: true }] : []),
                     ])}
                     className={linkClass(noteUrl) + ' w-full text-left'}
@@ -520,6 +669,21 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
               )}
             </span>
           </Link>
+          <Link
+            href="/trash"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-[#7a7a7a] hover:bg-[#f0f0f2] hover:text-[#1d1d1f] transition-colors"
+          >
+            <Trash2 size={13} />
+            Papelera
+          </Link>
+          <button
+            onClick={() => setShortcutsOpen(true)}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-[#7a7a7a] hover:bg-[#f0f0f2] hover:text-[#1d1d1f] transition-colors"
+          >
+            <Keyboard size={13} />
+            Atajos de teclado
+            <kbd className="ml-auto text-[10px] text-[#a0a0a8] bg-[#f5f5f7] border border-[#e5e5ea] rounded px-1 py-0.5 font-mono">?</kbd>
+          </button>
           <button
             onClick={() => signOut({ callbackUrl: '/auth/login' })}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-[#7a7a7a] hover:bg-[#f0f0f2] hover:text-[#1d1d1f] transition-colors"
@@ -563,13 +727,18 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
           board={editBoard}
         />
       )}
-      <ConfirmModal
+      <ShortcutsModal
+        isOpen={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
+      <ConfirmDialog
         isOpen={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
         title={`Eliminar ${confirmDelete?.type === 'project' ? 'proyecto' : confirmDelete?.type === 'board' ? 'tablero' : 'nota'}`}
         message={`¿Estás seguro de que querés eliminar "${confirmDelete?.title}"? Esta acción no se puede deshacer.`}
-        confirmText={deleting ? 'Eliminando...' : 'Eliminar'}
+        confirmText="Eliminar"
+        isLoading={deleting}
         variant="danger"
       />
       {contextMenu && (

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 type NotificationType = 'success' | 'error' | 'info';
 
@@ -51,33 +52,43 @@ export function useNotification() {
   return context;
 }
 
+const TOAST_META = {
+  success: { Icon: CheckCircle2, iconClass: 'text-[#34c759]' },
+  error: { Icon: AlertCircle, iconClass: 'text-[#ff3b30]' },
+  info: { Icon: Info, iconClass: 'text-[#0066cc]' },
+} as const;
+
 function NotificationContainer() {
   const { notifications, removeNotification } = useNotification();
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
-      {notifications.map((notification) => (
-        <div
-          key={notification.id}
-          className={`px-4 py-3 rounded-lg shadow-lg text-sm font-medium min-w-[300px] animate-in slide-in-from-right-5 fade-in-20 ${
-            notification.type === 'success'
-              ? 'bg-green-500 text-white'
-              : notification.type === 'error'
-              ? 'bg-red-500 text-white'
-              : 'bg-gray-800 text-white'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span>{notification.message}</span>
+    <div
+      className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none"
+      role="status"
+      aria-live="polite"
+    >
+      {notifications.map((notification) => {
+        const { Icon, iconClass } = TOAST_META[notification.type];
+        return (
+          <div
+            key={notification.id}
+            className="pointer-events-auto flex items-center gap-2.5 pl-3.5 pr-2.5 py-2.5 rounded-full text-[13px] font-medium min-w-[240px] max-w-[90vw]
+              bg-white/90 text-[#1d1d1f] border border-[#e5e5ea] shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl
+              dark:bg-[#2c2c2e]/90 dark:text-[#f5f5f7] dark:border-[#48484a]
+              animate-in slide-in-from-top-3 fade-in-20"
+          >
+            <Icon size={16} className={`${iconClass} shrink-0`} />
+            <span className="flex-1 leading-snug">{notification.message}</span>
             <button
               onClick={() => removeNotification(notification.id)}
-              className="ml-2 text-white/80 hover:text-white"
+              aria-label="Cerrar notificación"
+              className="p-1 rounded-full text-[#a0a0a8] hover:text-[#1d1d1f] hover:bg-black/5 dark:hover:bg-white/10 dark:hover:text-white transition-colors shrink-0"
             >
-              ×
+              <X size={13} />
             </button>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -11,14 +11,17 @@ import { IProject } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { useTabContext } from '@/components/tabs/TabContext';
 import SidebarContextMenu from '@/components/layout/SidebarContextMenu';
+import FavoriteButton from '@/components/ui/FavoriteButton';
 
 interface ProjectCardProps {
   project: IProject;
   boardCount: number;
   onBoardDrop?: (boardId: string, projectId: string) => void;
+  isFavorite?: boolean;
+  progress?: { total: number; done: number };
 }
 
-export default function ProjectCard({ project, boardCount, onBoardDrop }: ProjectCardProps) {
+export default function ProjectCard({ project, boardCount, onBoardDrop, isFavorite = false, progress }: ProjectCardProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const { openTab } = useTabContext();
@@ -102,8 +105,9 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
               </div>
             </div>
 
-            {/* Menu */}
-            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* Favorito + Menu */}
+            <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <FavoriteButton kind="project" resourceId={project._id.toString()} initialFavorite={isFavorite} />
               <button
                 onClick={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
@@ -115,6 +119,22 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
               </button>
             </div>
           </div>
+
+          {/* Barra de progreso */}
+          {progress && progress.total > 0 && (
+            <div className="mt-2.5">
+              <div className="flex items-center justify-between text-[10px] text-[#a0a0a8] mb-1">
+                <span>{progress.done}/{progress.total} tareas</span>
+                <span>{Math.round((progress.done / progress.total) * 100)}%</span>
+              </div>
+              <div className="h-1 rounded-full bg-[#f0f0f2] overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${(progress.done / progress.total) * 100}%`, backgroundColor: color }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[#f0f0f2]">
@@ -156,8 +176,8 @@ export default function ProjectCard({ project, boardCount, onBoardDrop }: Projec
             <p className="text-[#7a7a7a]">
               ¿Eliminar el proyecto <strong>&quot;{project.name}&quot;</strong>?
             </p>
-            <p className="text-sm text-red-500">
-              Se eliminarán permanentemente sus {boardCount} tablero{boardCount === 1 ? '' : 's'} y todas sus tareas.
+            <p className="text-sm text-[#7a7a7a]">
+              El proyecto irá a la papelera y sus {boardCount} tablero{boardCount === 1 ? '' : 's'} quedarán sin proyecto.
             </p>
           </div>
         }

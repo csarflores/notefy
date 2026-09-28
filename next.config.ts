@@ -5,9 +5,14 @@ const cloudfrontHost = cloudfrontUrl ? new URL(cloudfrontUrl).hostname : null;
 
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: cloudfrontHost
-      ? [{ protocol: "https", hostname: cloudfrontHost }]
-      : [],
+    remotePatterns: [
+      // Host actual de la distribución
+      ...(cloudfrontHost ? [{ protocol: "https" as const, hostname: cloudfrontHost }] : []),
+      // URLs persistidas con hosts de distribuciones viejas (p. ej. en JWTs de
+      // sesiones activas o comments.authorImage) muestran imagen rota en vez de
+      // romper el render de next/image
+      { protocol: "https", hostname: "**.cloudfront.net" },
+    ],
   },
 };
 

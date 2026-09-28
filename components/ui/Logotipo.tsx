@@ -18,32 +18,31 @@ export const Logo = ({
   
   const logoContent = (
     <div className="flex items-center gap-3 select-none">
-      {/* Isotipo Minimalista */}
-      <svg 
-        className={iconSize} 
-        viewBox="0 0 100 100" 
-        fill="none" 
+      {/* Isotipo: anteojos (símbolo oficial de Harold) */}
+      <svg
+        className={iconSize}
+        viewBox="0 0 1000 1000"
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Columna 1 (To Do) - Altura inicial */}
-        <rect x="20" y="35" width="14" height="40" rx="7" fill="#0066cc" />
-        
-        {/* Línea Diagonal Conectora de la 'N' - Sutil y fluida */}
-        <path 
-          d="M27 35L73 75" 
-          stroke="#0066cc" 
-          strokeWidth="14" 
-          strokeLinecap="round" 
-        />
-        
-        {/* Columna 3 (Done) - Elevada, simbolizando progreso */}
-        <rect x="66" y="25" width="14" height="40" rx="7" fill="#0066cc" />
+        <g
+          stroke="#0066cc"
+          strokeWidth="72"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="320" cy="500" r="205" />
+          <circle cx="680" cy="500" r="205" />
+          <path d="M525 500 C550 500 570 500 595 500" />
+          <path d="M115 500 H70" />
+          <path d="M885 500 H930" />
+        </g>
       </svg>
       
       {/* Logotipo / Texto */}
       {showText && (
         <span className={`${textSize} font-bold tracking-tight text-[#1d1d1f]`}>
-          Notefy
+          Harold
         </span>
       )}
     </div>

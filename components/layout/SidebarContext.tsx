@@ -6,14 +6,18 @@ interface SidebarContextValue {
   collapsed: boolean;
   toggle: () => void;
   setCollapsed: (v: boolean) => void;
+  mobileOpen: boolean;
+  setMobileOpen: (v: boolean) => void;
+  toggleMobile: () => void;
 }
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
-const STORAGE_KEY = 'notefy-sidebar-collapsed';
+const STORAGE_KEY = 'harold-sidebar-collapsed';
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsedState] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -28,9 +32,10 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   };
 
   const toggle = () => setCollapsed(!collapsed);
+  const toggleMobile = () => setMobileOpen((v) => !v);
 
   return (
-    <SidebarContext.Provider value={{ collapsed, toggle, setCollapsed }}>
+    <SidebarContext.Provider value={{ collapsed, toggle, setCollapsed, mobileOpen, setMobileOpen, toggleMobile }}>
       {children}
     </SidebarContext.Provider>
   );

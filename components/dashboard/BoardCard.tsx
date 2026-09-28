@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Users, MoreHorizontal, Edit2, Trash2, Lock, LayoutGrid, ExternalLink } from 'lucide-react';
+import { Users, MoreHorizontal, Edit2, Trash2, Lock, LayoutGrid, ExternalLink, Copy } from 'lucide-react';
 import EditBoardModal from './EditBoardModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { deleteBoard } from '@/actions/board-actions';
+import FavoriteButton from '@/components/ui/FavoriteButton';
+import { deleteBoard, duplicateBoard } from '@/actions/board-actions';
 import { IBoard } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { useTabContext } from '@/components/tabs/TabContext';
@@ -18,18 +19,20 @@ interface BoardCardProps {
   onDragStart?: (boardId: string, index: number, projectId?: string | null) => void;
   onDragEnd?: () => void;
   onDrop?: (boardId: string, index: number) => void;
-  isDragOver?: boolean;
+  dragOverCompatible?: boolean;
+  isFavorite?: boolean;
 }
 
-export default function BoardCard({ 
-  board, 
-  index = 0, 
-  onDragStart, 
-  onDragEnd, 
-  onDrop, 
-  isDragOver = false 
+export default function BoardCard({
+  board,
+  index = 0,
+  onDragStart,
+  onDragEnd,
+  onDrop,
+  dragOverCompatible = false,
+  isFavorite = false
 }: BoardCardProps) {
-  
+
   const router = useRouter();
   const { data: session } = useSession();
   const { openTab } = useTabContext();
@@ -38,6 +41,7 @@ export default function BoardCard({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isOver, setIsOver] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
 
   const openBoard = () => {
@@ -56,9 +60,19 @@ export default function BoardCard({
     openBoard();
   };
 
+  const handleDuplicate = async () => {
+    const result = await duplicateBoard(board._id.toString());
+    if (result.success) {
+      router.refresh();
+    } else {
+      console.error('Error al duplicar tablero:', result.error);
+    }
+  };
+
   const ctxItems: ContextMenuItem[] = [
     { label: 'Editar', icon: Edit2, onClick: () => setShowEditModal(true) },
     { label: 'Abrir', icon: ExternalLink, onClick: openBoard },
+    { label: 'Duplicar', icon: Copy, onClick: handleDuplicate, separator: true },
     ...(isBoardOwner ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setShowDeleteDialog(true), variant: 'danger' as const, separator: true }] : []),
   ];
 
@@ -79,10 +93,14 @@ export default function BoardCard({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    if (dragOverCompatible) setIsOver(true);
   };
+
+  const handleDragLeave = () => setIsOver(false);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsOver(false);
     
     const draggedBoardId = e.dataTransfer.getData('boardId');
     const draggedProjectId = e.dataTransfer.getData('projectId') || null;
@@ -119,10 +137,11 @@ export default function BoardCard({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`group relative bg-white rounded-xl border border-[#e0e0e0] overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer ${
         isDragging ? 'opacity-50 scale-95' : ''
-      } ${isDragOver ? 'ring-2 ring-[#0066cc] ring-offset-1' : ''}`}
+      } ${isOver ? 'ring-2 ring-[#0066cc] ring-offset-1' : ''}`}
     >
       {/* Color accent — left border */}
       <div
@@ -149,7 +168,8 @@ export default function BoardCard({
             </div>
           </div>
 
-          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <FavoriteButton kind="board" resourceId={board._id.toString()} initialFavorite={isFavorite} />
             <button
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -203,8 +223,8 @@ export default function BoardCard({
           <p className="text-[#7a7a7a]">
             ¿Estás seguro de que deseas eliminar el tablero <strong>&quot;{board.name}&quot;</strong>?
           </p>
-          <p className="text-sm text-red-500">
-            Esta acción eliminará permanentemente el tablero y todas sus tareas.
+          <p className="text-sm text-[#7a7a7a]">
+            El tablero y sus tareas irán a la papelera y podrás restaurarlos.
           </p>
         </div>
       }

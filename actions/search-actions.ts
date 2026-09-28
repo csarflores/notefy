@@ -30,6 +30,7 @@ export async function globalSearch(userId: string, query: string): Promise<Searc
 
   // Tableros accesibles para acotar la búsqueda de tareas
   const accessibleBoards = await Board.find({
+    deletedAt: null,
     $or: [{ owner: userId }, { members: user.email }],
   }).select('_id').lean();
   const boardIds = accessibleBoards.map(b => b._id);
@@ -37,6 +38,7 @@ export async function globalSearch(userId: string, query: string): Promise<Searc
   const [projects, boards, notes, tasks] = await Promise.all([
     Project.find({
       $and: [
+        { deletedAt: null },
         { $or: [{ owner: userId }, { members: user.email }] },
         { name: q },
       ],
@@ -44,6 +46,7 @@ export async function globalSearch(userId: string, query: string): Promise<Searc
 
     Board.find({
       $and: [
+        { deletedAt: null },
         { $or: [{ owner: userId }, { members: user.email }] },
         { name: q },
       ],
@@ -51,12 +54,13 @@ export async function globalSearch(userId: string, query: string): Promise<Searc
 
     Note.find({
       $and: [
+        { deletedAt: null },
         { $or: [{ owner: userId }, { members: user.email, visibility: 'shared' }] },
         { $or: [{ title: q }, { content: q }] },
       ],
     }).limit(limit).lean(),
 
-    Task.find({ boardId: { $in: boardIds }, title: q }).limit(limit).lean(),
+    Task.find({ boardId: { $in: boardIds }, deletedAt: null, title: q }).limit(limit).lean(),
   ]);
 
   const results: SearchResult[] = [
@@ -85,7 +89,7 @@ export async function globalSearch(userId: string, query: string): Promise<Searc
       type: 'task' as const,
       title: t.title,
       subtitle: `Estado: ${t.status}`,
-      url: `/board/${t.boardId}`,
+      url: `/board/${t.boardId}?task=${t._id}`,
     })),
   ];
 

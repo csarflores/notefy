@@ -17,7 +17,7 @@ interface CalendarFiltersProps {
 }
 
 export interface CalendarFilters {
-  status?: 'todo' | 'in-progress' | 'done' | 'all';
+  status?: string;
   projectId?: string | 'all';
   boardId?: string | 'all';
   assignedTo?: string | 'all';

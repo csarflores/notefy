@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
-import CreateTaskModal from '@/components/kanban/CreateTaskModal';
+import TaskDetailPanel from '@/components/kanban/TaskDetailPanel';
 import EditProjectModal from '@/components/dashboard/EditProjectModal';
-import InviteMemberModal from '@/components/project/InviteMemberModal';
+import ShareDialog from '@/components/share/ShareDialog';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { deleteProject } from '@/actions/project-actions';
 import { IProject } from '@/types';
@@ -143,18 +143,21 @@ export default function ProjectClient({ project }: ProjectClientProps) {
         </div>
       </div>
 
-      {/* Modal de crear tarea */}
-      <CreateTaskModal
+      {/* Panel de crear tarea */}
+      <TaskDetailPanel
         isOpen={isTaskModalOpen}
         onClose={() => setIsTaskModalOpen(false)}
-        projectId={project._id.toString()}
+        boardId={project._id.toString()}
       />
 
-      {/* Modal de invitar miembros */}
-      <InviteMemberModal
+      {/* Modal de compartir */}
+      <ShareDialog
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
-        project={project}
+        resourceType="project"
+        resourceId={project._id.toString()}
+        resourceName={project.name}
+        ownerId={project.owner.toString()}
       />
 
       {/* Modal de editar proyecto */}

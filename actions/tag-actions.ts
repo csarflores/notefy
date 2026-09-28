@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import Task from '@/models/Task';
 import { ApiResponse, ITag } from '@/types';
-import { getAuthUser, findAccessibleBoard, findOwnedBoard } from '@/lib/auth-helpers';
+import { getAuthUser, findAccessibleBoard, findEditableBoard, findOwnedBoard } from '@/lib/auth-helpers';
 
 export async function getBoardTags(boardId: string): Promise<ApiResponse<ITag[]>> {
   try {
@@ -34,7 +34,7 @@ export async function addBoardTag(boardId: string, tag: ITag): Promise<ApiRespon
     if (text.length > 30) return { success: false, error: 'El texto no puede exceder 30 caracteres' };
     if (!/^#[0-9A-F]{6}$/i.test(tag.color)) return { success: false, error: 'Color inválido' };
 
-    const board = await findAccessibleBoard(boardId, user);
+    const board = await findEditableBoard(boardId, user);
     if (!board) return { success: false, error: 'Tablero no encontrado o sin permisos' };
 
     const exists = board.tags.some((t: ITag) => t.text.toLowerCase() === text.toLowerCase());
@@ -69,7 +69,7 @@ export async function updateBoardTag(
     if (newText.length > 30) return { success: false, error: 'El texto no puede exceder 30 caracteres' };
     if (!/^#[0-9A-F]{6}$/i.test(newTag.color)) return { success: false, error: 'Color inválido' };
 
-    const board = await findAccessibleBoard(boardId, user);
+    const board = await findEditableBoard(boardId, user);
     if (!board) return { success: false, error: 'Tablero no encontrado o sin permisos' };
 
     const tagIndex = board.tags.findIndex((t: ITag) => t.text.toLowerCase() === oldText.toLowerCase());

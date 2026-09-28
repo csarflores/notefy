@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUpload } from '@/hooks/useUpload';
+import { useNotification } from '@/components/ui/NotificationContext';
 import type { UploadScope } from '@/actions/upload-actions';
 
 const lowlight = createLowlight(common);
@@ -48,6 +49,9 @@ interface NoteEditorProps {
   // Si ambos están presentes, el editor permite subir imágenes a S3
   uploadScope?: UploadScope;
   uploadResourceId?: string;
+  // Alternativa cuando el recurso aún no existe (p.ej. tarea nueva):
+  // recibe el File y devuelve una URL local (blob:) para insertarla de inmediato
+  onLocalImage?: (file: File) => string;
 }
 
 export default function NoteEditor({
@@ -60,11 +64,17 @@ export default function NoteEditor({
   minHeight = '200px',
   uploadScope,
   uploadResourceId,
+  onLocalImage,
 }: NoteEditorProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
+  const [linkInputOpen, setLinkInputOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
   const { upload } = useUpload();
+  const { showNotification } = useNotification();
   const canUploadImages = !!(uploadScope && uploadResourceId);
+  const canInsertImages = canUploadImages || !!onLocalImage;
   const fixContent = (html: string) => {
     if (!html) return html;
     let fixed = html;
@@ -159,23 +169,43 @@ export default function NoteEditor({
     }
   }, [editor, editable]);
 
-  // Sube la imagen a S3 y la inserta en el editor
+  // En modo lectura, sincronizar el contenido cuando cambia la prop
+  // (p.ej. [[links]] resueltos a anchors). En modo edición no tocar nada.
+  useEffect(() => {
+    if (!editor || editable || editor.isDestroyed) return;
+    const next = fixContent(content);
+    if (editor.getHTML() !== next) {
+      editor.commands.setContent(next, { emitUpdate: false });
+    }
+  }, [editor, editable, content]);
+
+  // Sube la imagen a S3 y la inserta en el editor (o inserta URL local si no hay destino aún)
   const insertImageFile = async (file: File, at?: number) => {
-    if (!uploadScope || !uploadResourceId) return;
+    const insertAt = (src: string) => {
+      if (editor && !editor.isDestroyed) {
+        const chain = editor.chain().focus();
+        if (typeof at === 'number') chain.setTextSelection(at);
+        chain.setImage({ src }).run();
+      }
+    };
+
+    if (!uploadScope || !uploadResourceId) {
+      if (onLocalImage) {
+        const src = onLocalImage(file);
+        if (src) insertAt(src);
+      }
+      return;
+    }
 
     setIsImageUploading(true);
     const result = await upload(file, { scope: uploadScope, resourceId: uploadResourceId });
     setIsImageUploading(false);
 
     if ('error' in result) {
-      window.alert(result.error);
+      showNotification(result.error, 'error');
       return;
     }
-    if (editor && !editor.isDestroyed) {
-      const chain = editor.chain().focus();
-      if (typeof at === 'number') chain.setTextSelection(at);
-      chain.setImage({ src: result.publicUrl }).run();
-    }
+    insertAt(result.publicUrl);
   };
 
   if (!editor) return null;
@@ -220,6 +250,25 @@ export default function NoteEditor({
 
   const charCount = editor.getHTML().length;
   const isOverLimit = charCount > maxLength;
+
+  const openLinkInput = () => {
+    const existing = editor.getAttributes('link').href as string | undefined;
+    setLinkUrl(existing || '');
+    setLinkInputOpen(true);
+    setTimeout(() => linkInputRef.current?.focus(), 30);
+  };
+
+  const applyLink = () => {
+    const url = linkUrl.trim();
+    if (!url) {
+      editor.chain().focus().unsetLink().run();
+    } else {
+      const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+      editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+    }
+    setLinkInputOpen(false);
+    setLinkUrl('');
+  };
 
   return (
     <div className="overflow-hidden bg-white">
@@ -304,17 +353,14 @@ export default function NoteEditor({
           </ToolbarButton>
 
           <ToolbarButton
-            onClick={() => {
-              const url = window.prompt('URL:');
-              if (url) editor.chain().focus().setLink({ href: url }).run();
-            }}
-            active={editor.isActive('link')}
+            onClick={openLinkInput}
+            active={editor.isActive('link') || linkInputOpen}
             title="Enlace"
           >
             <LinkIcon className="w-3.5 h-3.5" />
           </ToolbarButton>
 
-          {canUploadImages && (
+          {canInsertImages && (
             <ToolbarButton
               onClick={() => imageInputRef.current?.click()}
               title="Imagen"
@@ -366,9 +412,41 @@ export default function NoteEditor({
         </div>
       )}
 
+      {linkInputOpen && (
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#f0f0f0] bg-[#fafafc]">
+          <LinkIcon className="w-3.5 h-3.5 text-[#8e8e93] shrink-0" />
+          <input
+            ref={linkInputRef}
+            type="url"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
+              if (e.key === 'Escape') { setLinkInputOpen(false); setLinkUrl(''); }
+            }}
+            placeholder="https://ejemplo.com — vacío para quitar el enlace"
+            className="flex-1 bg-transparent text-[12px] text-[#1d1d1f] placeholder-[#c7c7cc] outline-none"
+          />
+          <button
+            type="button"
+            onClick={applyLink}
+            className="text-[11px] font-medium text-[#0066cc] hover:text-[#0055aa] px-2 py-0.5"
+          >
+            Aplicar
+          </button>
+          <button
+            type="button"
+            onClick={() => { setLinkInputOpen(false); setLinkUrl(''); }}
+            className="text-[11px] text-[#8e8e93] hover:text-[#1d1d1f] px-1 py-0.5"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       <EditorContent editor={editor} />
 
-      {canUploadImages && (
+      {canInsertImages && (
         <input
           ref={imageInputRef}
           type="file"

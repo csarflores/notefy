@@ -1,6 +1,7 @@
 'use client';
 
 import { ITask } from '@/types';
+import { isTaskDone } from '@/lib/board-columns';
 import { Calendar, Clock, Users } from 'lucide-react';
 
 interface CalendarEventProps {
@@ -41,7 +42,7 @@ export default function CalendarEvent({ task, onClick }: CalendarEventProps) {
         borderColor: borderColor,
       }}
     >
-      <div className={`font-semibold text-sm mb-1 truncate${task.status === 'done' ? ' line-through opacity-60' : ''}`}>{task.title}</div>
+      <div className={`font-semibold text-sm mb-1 truncate${isTaskDone(task) ? ' line-through opacity-60' : ''}`}>{task.title}</div>
       
       <div className="flex items-center gap-2 text-[10px] opacity-75">
         {task.deliveryDate && (

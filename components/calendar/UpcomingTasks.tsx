@@ -1,6 +1,7 @@
 'use client';
 
 import { ITask } from '@/types';
+import { isTaskDone } from '@/lib/board-columns';
 import { Calendar, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -92,7 +93,7 @@ export default function UpcomingTasks({ tasks, onTaskClick }: UpcomingTasksProps
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className={`font-medium text-[#1d1d1f] mb-2 truncate${task.status === 'done' ? ' line-through opacity-60' : ''}`}>
+                  <h3 className={`font-medium text-[#1d1d1f] mb-2 truncate${isTaskDone(task) ? ' line-through opacity-60' : ''}`}>
                     {task.title}
                   </h3>
                   
@@ -147,7 +148,7 @@ export default function UpcomingTasks({ tasks, onTaskClick }: UpcomingTasksProps
                     </div>
                   )}
 
-                  {task.status === 'done' && (
+                  {isTaskDone(task) && (
                     <div className="flex items-center gap-1 text-green-600 text-xs">
                       <CheckCircle size={12} />
                       <span>Completado</span>

@@ -6,17 +6,25 @@ import { getUserProjects } from '@/actions/project-actions';
 import { getUserBoards } from '@/actions/board-actions';
 import { getUserNotes } from '@/actions/note-actions';
 import { getUsersByIds } from '@/actions/user-actions';
+import { getUserFavorites } from '@/actions/favorite-actions';
+import { getProjectsProgress } from '@/actions/dashboard-actions';
 import DashboardClient from './DashboardClient';
 import DashboardWithDragDrop from './DashboardWithDragDrop';
+import MyDayWidget from '@/components/dashboard/MyDayWidget';
+import RecentActivity from '@/components/dashboard/RecentActivity';
 import Footer from '@/components/dashboard/Footer';
 import TabSyncer from '@/components/tabs/TabSyncer';
 
 async function ProjectsAndBoardsList({ userId }: { userId: string }) {
-  const [projectsResult, boardsResult, notesResult] = await Promise.all([
+  const [projectsResult, boardsResult, notesResult, favoritesResult, progressResult] = await Promise.all([
     getUserProjects(userId),
     getUserBoards(userId),
-    getUserNotes(userId)
+    getUserNotes(userId),
+    getUserFavorites(),
+    getProjectsProgress(),
   ]);
+  const favorites = favoritesResult.success ? (favoritesResult.data || []) : [];
+  const progress = progressResult.success ? (progressResult.data || {}) : {};
 
   if (!projectsResult.success || !boardsResult.success || !notesResult.success) {
     return (
@@ -54,7 +62,7 @@ async function ProjectsAndBoardsList({ userId }: { userId: string }) {
       <div className="py-12 sm:py-16">
         <div className="max-w-lg mx-auto px-4">
           <h3 className="text-[17px] sm:text-[20px] font-semibold text-[#1d1d1f] mb-1 tracking-tight">
-            Bienvenido a Notefy
+            Bienvenido a Harold
           </h3>
           <p className="text-[13px] text-[#7a7a7a] mb-8">
             Empieza en tres pasos:
@@ -104,6 +112,8 @@ async function ProjectsAndBoardsList({ userId }: { userId: string }) {
       unassignedBoards={unassignedBoards}
       notes={notesWithOwnerInfo}
       userId={userId}
+      favorites={favorites}
+      progress={progress}
     />
   );
 }
@@ -147,12 +157,20 @@ export default async function DashboardPage() {
         {/* Botones de acción */}
         <DashboardClient userId={session.user.id} userName={session.user.name} userEmail={session.user.email} />
 
+        {/* Mi día: tareas vencidas, de hoy y de esta semana */}
+        <div className="mt-4 sm:mt-5">
+          <MyDayWidget userId={session.user.id} />
+        </div>
+
         {/* Lista de proyectos y tableros */}
         <div className="mt-4 sm:mt-5">
           <Suspense fallback={<ProjectsLoading />}>
             <ProjectsAndBoardsList userId={session.user.id} />
           </Suspense>
         </div>
+
+        {/* Actividad reciente */}
+        <RecentActivity />
       </div>
 
       <Footer />

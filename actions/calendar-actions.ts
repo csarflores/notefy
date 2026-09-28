@@ -4,18 +4,21 @@ import connectDB from '@/lib/mongodb';
 import Task from '@/models/Task';
 import Board from '@/models/Board';
 import { ApiResponse, ITask } from '@/types';
+import { Types } from 'mongoose';
 import { isValidObjectId } from '@/lib/utils';
+import { getDoneColumnId } from '@/lib/board-columns';
 import {
   getAuthUser,
   isSelf,
   findAccessibleProject,
-  findAccessibleTask,
+  findEditableTask,
   AuthUser,
 } from '@/lib/auth-helpers';
 
 // Obtiene los IDs de tableros donde el usuario es owner o member
 async function getAccessibleBoardIds(user: AuthUser) {
   const boards = await Board.find({
+    deletedAt: null,
     $or: [
       { owner: user.id },
       { members: user.email }
@@ -23,6 +26,17 @@ async function getAccessibleBoardIds(user: AuthUser) {
   }).select('_id').lean();
 
   return boards.map(board => board._id);
+}
+
+// Mapa boardId → ID de su columna "completada" (última columna del tablero)
+async function getDoneColumnMap(boardIds: Types.ObjectId[]) {
+  const boards = await Board.find({ _id: { $in: boardIds } }).select('_id columns').lean();
+  return new Map(boards.map((b) => [b._id.toString(), getDoneColumnId(b.columns)]));
+}
+
+function boardIdOf(task: { boardId: unknown }): string {
+  const b = task.boardId as { _id?: { toString(): string }; toString(): string };
+  return b?._id?.toString() ?? b?.toString();
 }
 
 // Obtener todas las tareas del usuario con deliveryDate
@@ -40,10 +54,11 @@ export async function getUserTasksWithDeliveryDate(userId: string): Promise<ApiR
     // Obtener tareas con deliveryDate de esos tableros
     const tasks = await Task.find({
       boardId: { $in: boardIds },
+      deletedAt: null,
       deliveryDate: { $ne: null }
     })
       .populate('assignedTo', 'name email image')
-      .populate({ path: 'boardId', select: 'name projectId color', populate: { path: 'projectId', select: 'name color' } })
+      .populate({ path: 'boardId', select: 'name projectId color columns', populate: { path: 'projectId', select: 'name color' } })
       .sort({ deliveryDate: 1 })
       .lean();
 
@@ -76,6 +91,7 @@ export async function getProjectTasksWithDeliveryDate(projectId: string, userId:
     // Obtener tableros del proyecto donde el usuario tiene acceso
     const boards = await Board.find({
       projectId: projectId,
+      deletedAt: null,
       $or: [
         { owner: userId },
         { members: user.email }
@@ -87,10 +103,11 @@ export async function getProjectTasksWithDeliveryDate(projectId: string, userId:
     // Obtener tareas con deliveryDate de esos tableros
     const tasks = await Task.find({
       boardId: { $in: boardIds },
+      deletedAt: null,
       deliveryDate: { $ne: null }
     })
       .populate('assignedTo', 'name email image')
-      .populate({ path: 'boardId', select: 'name projectId color', populate: { path: 'projectId', select: 'name color' } })
+      .populate({ path: 'boardId', select: 'name projectId color columns', populate: { path: 'projectId', select: 'name color' } })
       .sort({ deliveryDate: 1 })
       .lean();
 
@@ -117,23 +134,27 @@ export async function getUpcomingTasks(userId: string, days: number = 7): Promis
     futureDate.setDate(currentDate.getDate() + days);
 
     const boardIds = await getAccessibleBoardIds(user);
+    const doneMap = await getDoneColumnMap(boardIds);
 
     // Obtener tareas con deliveryDate en el rango especificado
     const tasks = await Task.find({
       boardId: { $in: boardIds },
+      deletedAt: null,
       deliveryDate: {
         $ne: null,
         $gte: currentDate,
         $lte: futureDate
-      },
-      status: { $ne: 'done' }
+      }
     })
       .populate('assignedTo', 'name email image')
-      .populate({ path: 'boardId', select: 'name projectId color', populate: { path: 'projectId', select: 'name color' } })
+      .populate({ path: 'boardId', select: 'name projectId color columns', populate: { path: 'projectId', select: 'name color' } })
       .sort({ deliveryDate: 1 })
       .lean();
 
-    return { success: true, data: JSON.parse(JSON.stringify(tasks)) };
+    // Excluir las que ya están en la columna "completada" de su tablero
+    const pending = tasks.filter((t) => t.status !== doneMap.get(boardIdOf(t)));
+
+    return { success: true, data: JSON.parse(JSON.stringify(pending)) };
   } catch (error) {
     console.error('Error al obtener tareas próximas a vencer:', error);
     return { success: false, error: 'Error al obtener las tareas próximas a vencer' };
@@ -153,22 +174,25 @@ export async function getOverdueTasks(userId: string): Promise<ApiResponse<ITask
     const currentDate = new Date();
 
     const boardIds = await getAccessibleBoardIds(user);
+    const doneMap = await getDoneColumnMap(boardIds);
 
     // Obtener tareas vencidas
     const tasks = await Task.find({
       boardId: { $in: boardIds },
+      deletedAt: null,
       deliveryDate: {
         $ne: null,
         $lt: currentDate
-      },
-      status: { $ne: 'done' }
+      }
     })
       .populate('assignedTo', 'name email image')
-      .populate({ path: 'boardId', select: 'name projectId color', populate: { path: 'projectId', select: 'name color' } })
+      .populate({ path: 'boardId', select: 'name projectId color columns', populate: { path: 'projectId', select: 'name color' } })
       .sort({ deliveryDate: 1 })
       .lean();
 
-    return { success: true, data: JSON.parse(JSON.stringify(tasks)) };
+    const pending = tasks.filter((t) => t.status !== doneMap.get(boardIdOf(t)));
+
+    return { success: true, data: JSON.parse(JSON.stringify(pending)) };
   } catch (error) {
     console.error('Error al obtener tareas vencidas:', error);
     return { success: false, error: 'Error al obtener las tareas vencidas' };
@@ -183,9 +207,9 @@ export async function updateTaskDeliveryDate(taskId: string, deliveryDate: Date)
       return { success: false, error: 'No autenticado' };
     }
 
-    const task = await findAccessibleTask(taskId, user);
+    const task = await findEditableTask(taskId, user);
     if (!task) {
-      return { success: false, error: 'Tarea no encontrada o sin permisos' };
+      return { success: false, error: 'Tarea no encontrada o sin permisos de edición' };
     }
 
     task.deliveryDate = deliveryDate;

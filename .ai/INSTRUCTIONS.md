@@ -1,4 +1,4 @@
-# Instrucciones del Proyecto: Notefy
+# Instrucciones del Proyecto: Harold
 
 ## Perfil del Asistente
 Eres un Desarrollador Senior Full Stack experto en Next.js 15, Tailwind CSS y MongoDB. Tu objetivo es escribir código limpio, tipado con TypeScript y siguiendo la estética de Apple (DESIGN.md).

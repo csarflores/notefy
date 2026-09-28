@@ -1,8 +1,20 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
 import bcrypt from 'bcryptjs';
 import connectDB from './mongodb';
 import User from '@/models/User';
+
+// Google OAuth solo se registra si las credenciales están configuradas
+const googleConfigured = !!(
+  process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+);
+
+// La verificación de email solo se exige si hay transporte de mail configurado,
+// para no bloquear entornos de desarrollo sin SMTP.
+export const mailConfigured = !!(
+  process.env.EMAIL_USER && process.env.EMAIL_APP_PASSWORD
+);
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -26,7 +38,8 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (!user.password) {
-          throw new Error('Usuario sin contraseña configurada');
+          // Cuenta creada vía OAuth: no tiene contraseña local
+          throw new Error('OAUTH_ACCOUNT');
         }
 
         // Verificar contraseña
@@ -39,6 +52,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Contraseña incorrecta');
         }
 
+        if (!user.emailVerified && mailConfigured) {
+          throw new Error('EMAIL_NOT_VERIFIED');
+        }
+
         return {
           id: user._id.toString(),
           email: user.email,
@@ -47,6 +64,14 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    ...(googleConfigured
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+          }),
+        ]
+      : []),
   ],
   session: {
     strategy: 'jwt',
@@ -56,6 +81,42 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/login',
   },
   callbacks: {
+    async signIn({ user, account }) {
+      // Auto-provisioning para OAuth: crear/vincular usuario en MongoDB
+      if (account?.provider === 'google') {
+        const email = user.email?.toLowerCase();
+        if (!email) return false;
+
+        await connectDB();
+        let dbUser = await User.findOne({ email });
+
+        if (!dbUser) {
+          dbUser = await User.create({
+            name: user.name || email.split('@')[0],
+            email,
+            image: user.image || undefined,
+            emailVerified: new Date(), // Google ya verifica el email
+          });
+        } else {
+          let dirty = false;
+          if (!dbUser.emailVerified) {
+            dbUser.emailVerified = new Date();
+            dirty = true;
+          }
+          if (!dbUser.image && user.image) {
+            dbUser.image = user.image;
+            dirty = true;
+          }
+          if (dirty) await dbUser.save();
+        }
+
+        // El JWT debe llevar el _id de MongoDB, no el sub de Google
+        user.id = dbUser._id.toString();
+        user.name = dbUser.name;
+        user.image = dbUser.image ?? undefined;
+      }
+      return true;
+    },
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;

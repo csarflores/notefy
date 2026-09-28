@@ -9,5 +9,6 @@ export const config = {
     '/notes/:path*',
     '/calendar/:path*',
     '/settings/:path*',
+    '/trash/:path*',
   ],
 };

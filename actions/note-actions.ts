@@ -3,14 +3,17 @@
 import { revalidatePath } from 'next/cache';
 import connectDB from '@/lib/mongodb';
 import Note from '@/models/Note';
-import { CreateNoteInput, UpdateNoteInput, ApiResponse, INote } from '@/types';
+import { CreateNoteInput, UpdateNoteInput, ApiResponse, INote, MemberRole } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
-import { deleteS3Prefix, S3_KEY_PREFIX } from '@/lib/s3';
+import { createInvitation } from '@/actions/invitation-actions';
+import { escapeRegExp } from '@/lib/utils';
+import crypto from 'crypto';
 import {
   getAuthUser,
   isSelf,
   isOwner,
   findAccessibleProject,
+  findEditableProject,
 } from '@/lib/auth-helpers';
 
 // Obtener todas las notas del usuario (incluyendo notas compartidas con él)
@@ -25,6 +28,7 @@ export async function getUserNotes(userId: string): Promise<ApiResponse<INote[]>
 
     // Buscar notas donde el usuario es owner O está en members (notas compartidas)
     const notes = await Note.find({
+      deletedAt: null,
       $or: [
         { owner: userId },
         { members: user.email, visibility: 'shared' }
@@ -66,6 +70,7 @@ export async function getProjectNotes(projectId: string, userId: string): Promis
     // - La nota es shared y el usuario es miembro del proyecto (para notas compartidas a nivel proyecto)
     const notes = await Note.find({
       projectId: projectId,
+      deletedAt: null,
       $or: [
         { owner: userId },
         { members: user.email, visibility: 'shared' },
@@ -107,7 +112,7 @@ export async function getNoteById(noteId: string, userId: string): Promise<ApiRe
 
     const note = await Note.findById(noteId);
 
-    if (!note) {
+    if (!note || note.deletedAt) {
       return { success: false, error: 'Nota no encontrada' };
     }
 
@@ -152,9 +157,9 @@ export async function createNote(
 
     // Si la nota está en un proyecto, verificar que el proyecto existe y el usuario tiene acceso
     if (data.projectId) {
-      const project = await findAccessibleProject(data.projectId, user);
+      const project = await findEditableProject(data.projectId, user);
       if (!project) {
-        return { success: false, error: 'Proyecto no encontrado o sin permisos' };
+        return { success: false, error: 'Proyecto no encontrado o sin permisos de edición' };
       }
     }
 
@@ -202,13 +207,17 @@ export async function updateNote(
 
     const note = await Note.findById(noteId);
 
-    if (!note) {
+    if (!note || note.deletedAt) {
       return { success: false, error: 'Nota no encontrada' };
     }
 
-    // Verificar permisos: owner o member (si es shared)
+    // Verificar permisos: owner o member con rol editor (si es shared)
     const isNoteOwner = isOwner(note, user);
-    const isMember = note.visibility === 'shared' && note.members.includes(user.email);
+    const memberRole = note.memberRoles?.get(user.email) ?? 'editor';
+    const isMember =
+      note.visibility === 'shared' &&
+      note.members.includes(user.email) &&
+      memberRole === 'editor';
 
     if (!isNoteOwner && !isMember) {
       return { success: false, error: 'No tienes permiso para editar esta nota' };
@@ -216,15 +225,20 @@ export async function updateNote(
 
     const updateData: UpdateNoteInput = {};
     if (data.title !== undefined) updateData.title = data.title.trim();
-    if (data.content !== undefined) updateData.content = data.content;
+    if (data.content !== undefined) {
+      updateData.content = data.content;
+      // Resolver [[links]] a otras notas
+      const linkedNotes = await resolveNoteLinks(data.content, user, noteId);
+      (updateData as Record<string, unknown>).linkedNotes = linkedNotes;
+    }
     if (data.visibility !== undefined) updateData.visibility = data.visibility;
     if (data.color !== undefined) updateData.color = data.color;
     if (data.projectId !== undefined) {
       if (data.projectId && !isValidObjectId(data.projectId)) {
         return { success: false, error: 'ID de proyecto inválido' };
       }
-      if (data.projectId && !(await findAccessibleProject(data.projectId, user))) {
-        return { success: false, error: 'Proyecto no encontrado o sin permisos' };
+      if (data.projectId && !(await findEditableProject(data.projectId, user))) {
+        return { success: false, error: 'Proyecto no encontrado o sin permisos de edición' };
       }
       updateData.projectId = data.projectId;
     }
@@ -282,8 +296,9 @@ export async function deleteNote(noteId: string, userId: string): Promise<ApiRes
       return { success: false, error: 'Solo el propietario puede eliminar la nota' };
     }
 
-    await Note.findByIdAndDelete(noteId);
-    await deleteS3Prefix(`${S3_KEY_PREFIX}/notas/${noteId}/`);
+    // Soft-delete: la nota va a la papelera y se puede restaurar
+    note.deletedAt = new Date();
+    await note.save();
 
     revalidatePath('/dashboard');
     revalidatePath(`/notes/${noteId}`);
@@ -298,58 +313,28 @@ export async function deleteNote(noteId: string, userId: string): Promise<ApiRes
   }
 }
 
-// Compartir nota con un usuario
+// Invitar un usuario a la nota — crea invitación pendiente con rol
 export async function shareNote(
   noteId: string,
   userId: string,
-  email: string
-): Promise<ApiResponse<INote>> {
+  email: string,
+  role: MemberRole = 'editor'
+): Promise<ApiResponse<null>> {
   try {
-    if (!isValidObjectId(noteId)) {
-      return { success: false, error: 'ID de nota inválido' };
-    }
-
     const user = await getAuthUser();
     if (!user || !isSelf(user, userId)) {
       return { success: false, error: 'No autorizado' };
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      return { success: false, error: 'Email inválido' };
+    const result = await createInvitation('note', noteId, email, role);
+    if (!result.success) {
+      return { success: false, error: result.error };
     }
-
-    await connectDB();
-
-    const note = await Note.findById(noteId);
-
-    if (!note) {
-      return { success: false, error: 'Nota no encontrada' };
-    }
-
-    // Solo el owner puede compartir
-    if (!isOwner(note, user)) {
-      return { success: false, error: 'Solo el propietario puede compartir la nota' };
-    }
-
-    // Cambiar visibilidad a shared si no lo es
-    if (note.visibility !== 'shared') {
-      note.visibility = 'shared';
-    }
-
-    if (note.members.includes(email)) {
-      return { success: false, error: 'El usuario ya tiene acceso a esta nota' };
-    }
-
-    note.members.push(email);
-    await note.save();
 
     revalidatePath('/dashboard');
     revalidatePath(`/notes/${noteId}`);
-    if (note.projectId) {
-      revalidatePath(`/parent-project/${note.projectId}`);
-    }
 
-    return { success: true, data: JSON.parse(JSON.stringify(note)) };
+    return { success: true, data: null };
   } catch (error) {
     console.error('Error al compartir nota:', error);
     return { success: false, error: 'Error al compartir la nota' };
@@ -376,7 +361,7 @@ export async function removeNoteMember(
 
     const note = await Note.findById(noteId);
 
-    if (!note) {
+    if (!note || note.deletedAt) {
       return { success: false, error: 'Nota no encontrada' };
     }
 
@@ -386,6 +371,7 @@ export async function removeNoteMember(
     }
 
     note.members = note.members.filter((member) => member !== email);
+    note.memberRoles?.delete(email);
 
     // Si no hay miembros, volver a private
     if (note.members.length === 0) {
@@ -404,5 +390,181 @@ export async function removeNoteMember(
   } catch (error) {
     console.error('Error al remover miembro:', error);
     return { success: false, error: 'Error al remover el miembro' };
+  }
+}
+
+// Extrae [[Título de nota]] del contenido y resuelve los IDs de notas accesibles
+async function resolveNoteLinks(
+  content: string,
+  user: { id: string; email: string },
+  excludeId?: string
+) {
+  const titles = [...content.matchAll(/\[\[([^\[\]]{1,200})\]\]/g)]
+    .map((m) => m[1].trim())
+    .filter(Boolean);
+  if (titles.length === 0) return [];
+
+  const regexes = titles.map((t) => new RegExp(`^${escapeRegExp(t)}$`, 'i'));
+  const notes = await Note.find({
+    deletedAt: null,
+    title: { $in: regexes },
+    $or: [{ owner: user.id }, { members: user.email }],
+  })
+    .select('_id')
+    .lean();
+
+  return notes.map((n) => n._id).filter((id) => id.toString() !== excludeId);
+}
+
+// Devuelve las notas enlazadas ([[links]]) y los backlinks de una nota
+export async function getNoteLinks(
+  noteId: string
+): Promise<ApiResponse<{ links: { _id: string; title: string; color: string }[]; backlinks: { _id: string; title: string; color: string }[] }>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+    if (!isValidObjectId(noteId)) {
+      return { success: false, error: 'ID de nota inválido' };
+    }
+
+    await connectDB();
+    const note = await Note.findById(noteId);
+    if (!note || note.deletedAt) {
+      return { success: false, error: 'Nota no encontrada' };
+    }
+
+    const accessFilter = {
+      deletedAt: null,
+      $or: [
+        { owner: user.id },
+        { members: user.email, visibility: 'shared' as const },
+      ],
+    };
+
+    const [links, backlinks] = await Promise.all([
+      Note.find({ ...accessFilter, _id: { $in: note.linkedNotes ?? [] } })
+        .select('_id title color')
+        .lean(),
+      Note.find({ ...accessFilter, linkedNotes: note._id })
+        .select('_id title color')
+        .lean(),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        links: JSON.parse(JSON.stringify(links)),
+        backlinks: JSON.parse(JSON.stringify(backlinks)),
+      },
+    };
+  } catch (error) {
+    console.error('Error al obtener enlaces de nota:', error);
+    return { success: false, error: 'Error al obtener los enlaces' };
+  }
+}
+
+// Crear (o devolver) el link público de solo lectura de una nota (solo owner)
+export async function createPublicNoteLink(
+  noteId: string,
+  userId: string
+): Promise<ApiResponse<{ token: string }>> {
+  try {
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+    if (!isValidObjectId(noteId)) {
+      return { success: false, error: 'ID de nota inválido' };
+    }
+
+    await connectDB();
+    const note = await Note.findById(noteId);
+    if (!note || note.deletedAt) {
+      return { success: false, error: 'Nota no encontrada' };
+    }
+    if (!isOwner(note, user)) {
+      return { success: false, error: 'Solo el propietario puede crear un link público' };
+    }
+
+    if (!note.publicToken) {
+      note.publicToken = crypto.randomBytes(24).toString('hex');
+      await note.save();
+    }
+
+    return { success: true, data: { token: note.publicToken } };
+  } catch (error) {
+    console.error('Error al crear link público:', error);
+    return { success: false, error: 'Error al crear el link' };
+  }
+}
+
+// Revocar el link público de una nota (solo owner)
+export async function revokePublicNoteLink(
+  noteId: string,
+  userId: string
+): Promise<ApiResponse<null>> {
+  try {
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+    if (!isValidObjectId(noteId)) {
+      return { success: false, error: 'ID de nota inválido' };
+    }
+
+    await connectDB();
+    const note = await Note.findById(noteId);
+    if (!note || note.deletedAt) {
+      return { success: false, error: 'Nota no encontrada' };
+    }
+    if (!isOwner(note, user)) {
+      return { success: false, error: 'Solo el propietario puede revocar el link' };
+    }
+
+    note.publicToken = null;
+    await note.save();
+
+    revalidatePath(`/notes/${noteId}`);
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al revocar link público:', error);
+    return { success: false, error: 'Error al revocar el link' };
+  }
+}
+
+// Vista pública de solo lectura — sin sesión, acceso por token
+export async function getPublicNote(
+  token: string
+): Promise<ApiResponse<{ title: string; content: string; updatedAt: string }>> {
+  try {
+    if (!token || typeof token !== 'string' || token.length > 128) {
+      return { success: false, error: 'Link inválido' };
+    }
+    await connectDB();
+    const note = await Note.findOne({ publicToken: token, deletedAt: null })
+      .select('title content updatedAt')
+      .lean();
+    if (!note) {
+      return { success: false, error: 'Nota no encontrada o link revocado' };
+    }
+    // Sanitización básica: eliminar scripts/iframes/handlers inline del HTML de TipTap
+    const safeContent = (note.content ?? '')
+      .replace(/<(script|iframe|object|embed|form|link|meta)[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/<(script|iframe|object|embed|form|link|meta)[^>]*\/?>/gi, '')
+      .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(/(href|src)\s*=\s*(['"]?)\s*javascript:[^'">\s]*\2/gi, '$1="#"');
+    return {
+      success: true,
+      data: {
+        title: note.title,
+        content: safeContent,
+        updatedAt: note.updatedAt?.toISOString?.() ?? '',
+      },
+    };
+  } catch (error) {
+    console.error('Error al obtener nota pública:', error);
+    return { success: false, error: 'Error al obtener la nota' };
   }
 }

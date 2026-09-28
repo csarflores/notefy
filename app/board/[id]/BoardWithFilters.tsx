@@ -3,9 +3,10 @@
 import { useState, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import KanbanBoard from '@/components/kanban/KanbanBoard';
+import TaskListView from '@/components/kanban/TaskListView';
 import TaskFilters, { FilterType } from '@/components/kanban/TaskFilters';
-import { ITask, IUser, ITag } from '@/types';
-import { Inbox } from 'lucide-react';
+import { ITask, IUser, ITag, IBoardColumn } from '@/types';
+import { Inbox, KanbanSquare, List } from 'lucide-react';
 
 interface BoardWithFiltersProps {
   tasks: ITask[];
@@ -13,6 +14,9 @@ interface BoardWithFiltersProps {
   boardOwnerId: string;
   boardUsers: IUser[];
   boardTags: ITag[];
+  canEdit?: boolean;
+  canComment?: boolean;
+  columns?: IBoardColumn[];
 }
 
 export default function BoardWithFilters({
@@ -20,10 +24,21 @@ export default function BoardWithFilters({
   boardId,
   boardOwnerId,
   boardUsers,
-  boardTags
+  boardTags,
+  canEdit = true,
+  canComment = true,
+  columns
 }: BoardWithFiltersProps) {
   const { data: session } = useSession();
   const [currentFilter, setCurrentFilter] = useState<FilterType>('all');
+  const [view, setView] = useState<'kanban' | 'list'>(() =>
+    typeof window !== 'undefined' && localStorage.getItem('board-view') === 'list' ? 'list' : 'kanban'
+  );
+
+  const handleViewChange = (v: 'kanban' | 'list') => {
+    setView(v);
+    try { localStorage.setItem('board-view', v); } catch {}
+  };
 
   // Si no hay tags en el tablero, extraer todas las tags únicas de las tareas
   const allTags = useMemo(() => {
@@ -65,8 +80,18 @@ export default function BoardWithFilters({
       });
     }
 
-    if (currentFilter === 'todo' || currentFilter === 'in-progress' || currentFilter === 'done') {
-      return tasks.filter(task => task.status === currentFilter);
+    // Filtro por columna del tablero (col:<id>)
+    if (currentFilter.startsWith('col:')) {
+      const columnId = currentFilter.slice(4);
+      return tasks.filter(task => task.status === columnId);
+    }
+
+    // Filtro por prioridad
+    if (currentFilter.startsWith('priority:')) {
+      const p = currentFilter.split(':')[1];
+      return tasks.filter((task) =>
+        p === 'none' ? !task.priority : task.priority === p
+      );
     }
 
     // Verificar si es un filtro por etiqueta
@@ -118,12 +143,37 @@ export default function BoardWithFilters({
                 currentUserId={session?.user?.id}
                 projectUsers={boardUsers}
                 projectTags={allTags}
+                columns={columns}
               />
               {filteredTasks.length !== tasks.length && (
                 <span className="text-[11px] text-[#7a7a7a] tracking-[-0.08px]">
                   {filteredTasks.length} de {tasks.length} tareas
                 </span>
               )}
+            </div>
+
+            {/* Toggle kanban/lista */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[#f0f0f2]">
+              <button
+                type="button"
+                onClick={() => handleViewChange('kanban')}
+                title="Vista kanban"
+                className={`p-1.5 rounded-md transition-all ${
+                  view === 'kanban' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-[#8e8e93] hover:text-[#3a3a3c]'
+                }`}
+              >
+                <KanbanSquare size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleViewChange('list')}
+                title="Vista lista"
+                className={`p-1.5 rounded-md transition-all ${
+                  view === 'list' ? 'bg-white shadow-sm text-[#1d1d1f]' : 'text-[#8e8e93] hover:text-[#3a3a3c]'
+                }`}
+              >
+                <List size={15} />
+              </button>
             </div>
           </div>
 
@@ -141,8 +191,10 @@ export default function BoardWithFilters({
                 Intenta con otro filtro o crea una nueva tarea
               </p>
             </div>
+          ) : view === 'list' ? (
+            <TaskListView tasks={filteredTasks} columns={columns} canEdit={canEdit} canComment={canComment} />
           ) : (
-            <KanbanBoard initialTasks={filteredTasks} boardId={boardId} boardOwnerId={boardOwnerId} />
+            <KanbanBoard initialTasks={filteredTasks} boardId={boardId} boardOwnerId={boardOwnerId} canEdit={canEdit} canComment={canComment} columns={columns} />
           )}
         </>
       )}

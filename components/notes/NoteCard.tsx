@@ -8,6 +8,7 @@ import { useTabContext } from '@/components/tabs/TabContext';
 import { formatDate } from '@/lib/utils';
 import SidebarContextMenu from '@/components/layout/SidebarContextMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import FavoriteButton from '@/components/ui/FavoriteButton';
 import { deleteNote } from '@/actions/note-actions';
 
 interface NoteCardProps {
@@ -16,9 +17,10 @@ interface NoteCardProps {
   isOwner?: boolean;
   userId?: string;
   onDelete?: () => void;
+  isFavorite?: boolean;
 }
 
-export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onDelete }: NoteCardProps) {
+export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onDelete, isFavorite = false }: NoteCardProps) {
   const router = useRouter();
   const { openTab } = useTabContext();
   const [preview, setPreview] = useState('');
@@ -54,8 +56,8 @@ export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onD
       return;
     }
     openTab({
-      id: `board-${note._id}`,
-      type: 'board',
+      id: `note-${note._id}`,
+      type: 'note',
       title: note.title,
       url: `/notes/${note._id}`,
       resourceId: note._id.toString(),
@@ -63,7 +65,7 @@ export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onD
     router.push(`/notes/${note._id}`);
   };
 
-  const noteColor = '#10b981';
+  const noteColor = note.color || '#f59e0b';
 
   return (
     <>
@@ -81,6 +83,9 @@ export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onD
               <FileText size={13} style={{ color: noteColor }} />
             </div>
             <div className="min-w-0 flex-1">
+              <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+                <FavoriteButton kind="note" resourceId={note._id.toString()} initialFavorite={isFavorite} />
+              </div>
               <h3 className="text-[14px] font-semibold text-[#1d1d1f] truncate tracking-[-0.2px] group-hover:text-[#0066cc] transition-colors">
                 {note.title}
               </h3>
@@ -125,7 +130,7 @@ export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onD
           message={
             <div className="space-y-2">
               <p className="text-[#7a7a7a]">¿Eliminar la nota <strong>&quot;{note.title}&quot;</strong>?</p>
-              <p className="text-sm text-red-500">Esta acción no se puede deshacer.</p>
+              <p className="text-sm text-[#7a7a7a]">La nota irá a la papelera y podrás restaurarla.</p>
             </div>
           }
           confirmText="Eliminar"

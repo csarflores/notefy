@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Harold glasses icon</title>
+  <desc id="desc">Minimal geometric glasses symbol for Harold in Action Blue.</desc>
+  <g fill="none" stroke="#0066CC" stroke-width="72" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="320" cy="500" r="205"/>
+    <circle cx="680" cy="500" r="205"/>
+    <path d="M525 500 C550 500 570 500 595 500"/>
+    <path d="M115 500 H70"/>
+    <path d="M885 500 H930"/>
+  </g>
+</svg>

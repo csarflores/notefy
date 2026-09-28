@@ -1,33 +1,51 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Folder, LayoutGrid, FileText, CheckSquare, Plus, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Search, Folder, LayoutGrid, FileText, CheckSquare,
+  Plus, FolderPlus, Clock, X, CornerDownLeft, CalendarDays,
+} from 'lucide-react';
 import { globalSearch, SearchResult } from '@/actions/search-actions';
-import { useTabContext } from '@/components/tabs/TabContext';
 import { useCommandPalette } from './CommandPaletteContext';
-import { useState } from 'react';
+import { useTabContext } from '@/components/tabs/TabContext';
+import { useRecents, RecentItem } from './useRecents';
 
-const TYPE_ICONS = {
-  project: <Folder size={14} className="text-[#0066cc]" />,
-  board: <LayoutGrid size={14} className="text-[#8b5cf6]" />,
-  note: <FileText size={14} className="text-[#10b981]" />,
-  task: <CheckSquare size={14} className="text-[#f97316]" />,
-};
-
-const TYPE_LABELS = {
-  project: 'Proyecto',
-  board: 'Tablero',
-  note: 'Nota',
-  task: 'Tarea',
-};
+const TYPE_META = {
+  project: { icon: Folder, label: 'Proyectos' },
+  board: { icon: LayoutGrid, label: 'Tableros' },
+  note: { icon: FileText, label: 'Notas' },
+  task: { icon: CheckSquare, label: 'Tareas' },
+} as const;
 
 const TAB_TYPES = {
   project: 'project',
   board: 'board',
-  note: 'board',
+  note: 'note',
   task: 'board',
 } as const;
+
+const RECENT_ICONS: Record<RecentItem['type'], React.ElementType> = {
+  project: Folder,
+  board: LayoutGrid,
+  note: FileText,
+  calendar: CalendarDays,
+};
+
+interface PaletteItem {
+  key: string;
+  icon: React.ElementType;
+  title: string;
+  subtitle?: string;
+  hint?: string;
+  onSelect: () => void;
+}
+
+interface PaletteSection {
+  label: string;
+  items: PaletteItem[];
+}
 
 interface CommandPaletteProps {
   userId: string;
@@ -36,186 +54,306 @@ interface CommandPaletteProps {
   onCreateNote: () => void;
 }
 
-export default function CommandPalette({
-  userId,
-  onCreateProject,
-  onCreateBoard,
-  onCreateNote,
-}: CommandPaletteProps) {
+export default function CommandPalette({ userId, onCreateProject, onCreateBoard, onCreateNote }: CommandPaletteProps) {
   const { isOpen, open, close } = useCommandPalette();
+  const { openTab } = useTabContext();
+  const { recents, push: pushRecent } = useRecents();
+  const router = useRouter();
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
-  const { openTab } = useTabContext();
+  const listRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Open on Ctrl+K / Cmd+K
+  // Atajo global Ctrl/Cmd + K
   useEffect(() => {
-    const onKeydown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        open();
+        if (isOpen) close(); else open();
       }
-      if (e.key === 'Escape') close();
     };
-    document.addEventListener('keydown', onKeydown);
-    return () => document.removeEventListener('keydown', onKeydown);
-  }, [open, close]);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, open, close]);
 
+  // Reset state on open
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
       setQuery('');
       setResults([]);
       setActiveIndex(0);
+      setTimeout(() => inputRef.current?.focus(), 30);
     }
   }, [isOpen]);
 
-  const search = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); return; }
-    setLoading(true);
-    const res = await globalSearch(userId, q);
-    setResults(res);
-    setActiveIndex(0);
-    setLoading(false);
-  }, [userId]);
-
+  // Debounced search
   useEffect(() => {
-    const timer = setTimeout(() => search(query), 200);
-    return () => clearTimeout(timer);
-  }, [query, search]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      if (!userId) { setLoading(false); return; }
+      const res = await globalSearch(userId, query);
+      setResults(res);
+      setLoading(false);
+      setActiveIndex(0);
+    }, 200);
+  }, [query, userId]);
 
-  const navigate = (result: SearchResult) => {
+  const navigate = useCallback((result: SearchResult) => {
+    close();
     const tabType = TAB_TYPES[result.type];
+    // Las tareas abren el tablero que las contiene (con deep-link ?task=)
+    const boardIdFromUrl = result.type === 'task'
+      ? result.url.split('/board/')[1]?.split('?')[0]
+      : undefined;
+    const tabId = boardIdFromUrl ? `board-${boardIdFromUrl}` : `${result.type}-${result.id}`;
     openTab({
-      id: `${result.type}-${result.id}`,
-      type: tabType === 'project' ? 'project' : 'board',
+      id: tabId,
+      type: tabType,
       title: result.title,
       url: result.url,
-      resourceId: result.id,
+      resourceId: boardIdFromUrl || result.id,
     });
+    pushRecent({ id: tabId, type: tabType as RecentItem['type'], title: result.title, url: result.url });
     router.push(result.url);
+  }, [close, openTab, pushRecent, router]);
+
+  const navigateRecent = useCallback((item: RecentItem) => {
     close();
-  };
+    openTab({ id: item.id, type: item.type, title: item.title, url: item.url });
+    router.push(item.url);
+  }, [close, openTab, router]);
 
-  const actions = [
-    { icon: <Folder size={14} className="text-[#0066cc]" />, label: 'Nuevo Proyecto', action: () => { close(); onCreateProject(); } },
-    { icon: <LayoutGrid size={14} className="text-[#8b5cf6]" />, label: 'Nuevo Tablero', action: () => { close(); onCreateBoard(); } },
-    { icon: <FileText size={14} className="text-[#10b981]" />, label: 'Nueva Nota', action: () => { close(); onCreateNote(); } },
-  ];
+  const runAction = useCallback((fn: () => void) => {
+    close();
+    fn();
+  }, [close]);
 
-  const allItems = results.length > 0 ? results : [];
+  // Build sections
+  const sections: PaletteSection[] = [];
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const total = allItems.length + (query ? 0 : actions.length);
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((i) => (i + 1) % total); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((i) => (i - 1 + total) % total); }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (allItems[activeIndex]) navigate(allItems[activeIndex]);
-      else if (!query && actions[activeIndex - allItems.length]) actions[activeIndex - allItems.length].action();
+  if (!query.trim()) {
+    if (recents.length > 0) {
+      sections.push({
+        label: 'Recientes',
+        items: recents.slice(0, 5).map((r) => ({
+          key: `recent-${r.id}`,
+          icon: RECENT_ICONS[r.type] || FileText,
+          title: r.title,
+          onSelect: () => navigateRecent(r),
+        })),
+      });
     }
-  };
+    sections.push({
+      label: 'Acciones',
+      items: [
+        {
+          key: 'action-board',
+          icon: Plus,
+          title: 'Nuevo tablero',
+          hint: 'B',
+          onSelect: () => runAction(onCreateBoard),
+        },
+        {
+          key: 'action-note',
+          icon: FileText,
+          title: 'Nueva nota',
+          hint: 'N',
+          onSelect: () => runAction(onCreateNote),
+        },
+        {
+          key: 'action-project',
+          icon: FolderPlus,
+          title: 'Nuevo proyecto',
+          hint: 'P',
+          onSelect: () => runAction(onCreateProject),
+        },
+      ],
+    });
+  } else {
+    const grouped = (['project', 'board', 'note', 'task'] as const)
+      .map((type) => ({
+        label: TYPE_META[type].label,
+        items: results
+          .filter((r) => r.type === type)
+          .map((r) => ({
+            key: `${r.type}-${r.id}`,
+            icon: TYPE_META[type].icon,
+            title: r.title,
+            subtitle: r.subtitle,
+            onSelect: () => navigate(r),
+          })),
+      }))
+      .filter((g) => g.items.length > 0);
+    sections.push(...grouped);
+  }
 
-  if (!isOpen) return null;
+  const total = sections.reduce((n, s) => n + s.items.length, 0);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { close(); return; }
+      if (total === 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIndex((i) => (i + 1) % total);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIndex((i) => (i - 1 + total) % total);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        let idx = 0;
+        for (const section of sections) {
+          for (const item of section.items) {
+            if (idx === activeIndex) { item.onSelect(); return; }
+            idx++;
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
+
+  // Scroll active into view
+  useEffect(() => {
+    const el = listRef.current?.querySelector(`[data-idx="${activeIndex}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
+
+  let flatIndex = -1;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
-      onClick={close}
-    >
-      <div className="absolute inset-0 bg-black/30" />
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[300] flex items-start justify-center pt-[14vh] px-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" onClick={close} />
 
-      <div
-        className="relative w-full max-w-lg mx-4 bg-white rounded-2xl shadow-2xl border border-[#e0e0e0] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#f0f0f2]">
-          <Search size={16} className="text-[#a0a0a8] shrink-0" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Buscar proyectos, tableros, notas, tareas..."
-            className="flex-1 text-[14px] text-[#1d1d1f] placeholder:text-[#a0a0a8] outline-none bg-transparent"
-          />
-          {query && (
-            <button onClick={() => setQuery('')} className="text-[#a0a0a8] hover:text-[#1d1d1f]">
-              <X size={14} />
-            </button>
-          )}
-          <kbd className="text-[10px] text-[#a0a0a8] bg-[#f5f5f7] px-1.5 py-0.5 rounded border border-[#e0e0e0]">
-            Esc
-          </kbd>
-        </div>
-
-        {/* Results */}
-        <div className="max-h-80 overflow-y-auto py-1.5">
-          {loading && (
-            <div className="px-4 py-3 text-[13px] text-[#a0a0a8]">Buscando...</div>
-          )}
-
-          {!loading && query && results.length === 0 && (
-            <div className="px-4 py-3 text-[13px] text-[#a0a0a8]">
-              Sin resultados para &ldquo;{query}&rdquo;
-            </div>
-          )}
-
-          {!loading && results.map((r, i) => (
-            <button
-              key={r.id}
-              onClick={() => navigate(r)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                i === activeIndex ? 'bg-[#f0f0f2]' : 'hover:bg-[#f5f5f7]'
-              }`}
-            >
-              <span className="shrink-0">{TYPE_ICONS[r.type]}</span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[13px] text-[#1d1d1f] truncate">{r.title}</span>
-                {r.subtitle && (
-                  <span className="block text-[11px] text-[#7a7a7a] truncate">{r.subtitle}</span>
-                )}
-              </span>
-              <span className="text-[10px] text-[#a0a0a8] bg-[#f5f5f7] px-1.5 py-0.5 rounded shrink-0">
-                {TYPE_LABELS[r.type]}
-              </span>
-            </button>
-          ))}
-
-          {!query && (
-            <>
-              <div className="px-4 py-1.5">
-                <span className="text-[11px] font-semibold text-[#a0a0a8] uppercase tracking-wider">
-                  Acciones rápidas
-                </span>
-              </div>
-              {actions.map((a, i) => (
-                <button
-                  key={a.label}
-                  onClick={a.action}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                    i === activeIndex ? 'bg-[#f0f0f2]' : 'hover:bg-[#f5f5f7]'
-                  }`}
-                >
-                  <Plus size={14} className="text-[#a0a0a8] shrink-0" />
-                  <span className="text-[13px] text-[#1d1d1f]">{a.label}</span>
-                  <span className="ml-auto">{a.icon}</span>
+          {/* Panel */}
+          <motion.div
+            className="relative w-full max-w-[540px] bg-white rounded-2xl shadow-2xl border border-[#e8e8ed] overflow-hidden"
+            initial={{ opacity: 0, scale: 0.97, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: -8 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+            role="dialog"
+            aria-label="Búsqueda global"
+          >
+            {/* Search input */}
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#f0f0f2]">
+              <Search size={17} className="text-[#a0a0a8] shrink-0" />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar proyectos, tableros, notas, tareas..."
+                className="flex-1 bg-transparent text-[15px] text-[#1d1d1f] placeholder-[#a0a0a8] outline-none"
+              />
+              {query && (
+                <button onClick={() => setQuery('')} className="text-[#a0a0a8] hover:text-[#7a7a7a] transition-colors">
+                  <X size={15} />
                 </button>
-              ))}
-            </>
-          )}
-        </div>
+              )}
+              <kbd className="text-[10px] text-[#a0a0a8] bg-[#f5f5f7] border border-[#e5e5ea] rounded px-1.5 py-0.5 font-mono">
+                ESC
+              </kbd>
+            </div>
 
-        <div className="px-4 py-2 border-t border-[#f0f0f2] flex items-center gap-3 text-[11px] text-[#a0a0a8]">
-          <span><kbd className="bg-[#f5f5f7] px-1 py-0.5 rounded border border-[#e0e0e0]">↑↓</kbd> navegar</span>
-          <span><kbd className="bg-[#f5f5f7] px-1 py-0.5 rounded border border-[#e0e0e0]">↵</kbd> abrir</span>
-          <span><kbd className="bg-[#f5f5f7] px-1 py-0.5 rounded border border-[#e0e0e0]">Esc</kbd> cerrar</span>
-        </div>
-      </div>
-    </div>
+            {/* Results */}
+            <div ref={listRef} className="max-h-[380px] overflow-y-auto py-2" role="listbox">
+              {loading && (
+                <div className="px-4 py-3 text-[13px] text-[#a0a0a8]">Buscando...</div>
+              )}
+
+              {!loading && sections.map((section) => (
+                <div key={section.label}>
+                  <div className="px-4 py-1.5 text-[10px] font-semibold text-[#a0a0a8] uppercase tracking-wider">
+                    {section.label}
+                  </div>
+                  {section.items.map((item) => {
+                    flatIndex += 1;
+                    const idx = flatIndex;
+                    const ItemIcon = item.icon;
+                    return (
+                      <button
+                        key={item.key}
+                        data-idx={idx}
+                        onClick={item.onSelect}
+                        onMouseEnter={() => setActiveIndex(idx)}
+                        role="option"
+                        aria-selected={activeIndex === idx}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                          activeIndex === idx ? 'bg-[#f0f6ff]' : 'hover:bg-[#fafafc]'
+                        }`}
+                      >
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                          activeIndex === idx ? 'bg-[#e0edff] text-[#0066cc]' : 'bg-[#f5f5f7] text-[#7a7a7a]'
+                        }`}>
+                          <ItemIcon size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-[#1d1d1f] truncate">{item.title}</p>
+                          {item.subtitle && (
+                            <p className="text-[11px] text-[#a0a0a8] truncate">{item.subtitle}</p>
+                          )}
+                        </div>
+                        {item.hint ? (
+                          <kbd className="text-[10px] text-[#a0a0a8] bg-[#f5f5f7] border border-[#e5e5ea] rounded px-1.5 py-0.5 font-mono shrink-0">
+                            {item.hint}
+                          </kbd>
+                        ) : activeIndex === idx ? (
+                          <CornerDownLeft size={12} className="text-[#0066cc] shrink-0" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {!loading && query.trim() && total === 0 && (
+                <div className="flex flex-col items-center py-10 text-center">
+                  <Search size={22} className="text-[#d1d1d6] mb-2" />
+                  <p className="text-[13px] text-[#7a7a7a]">Sin resultados para &quot;{query}&quot;</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-[#f0f0f2] px-4 py-2 flex items-center gap-4 text-[10px] text-[#a0a0a8]">
+              <span className="flex items-center gap-1">
+                <kbd className="font-mono bg-[#f5f5f7] border border-[#e5e5ea] rounded px-1">↑↓</kbd>
+                navegar
+              </span>
+              <span className="flex items-center gap-1">
+                <kbd className="font-mono bg-[#f5f5f7] border border-[#e5e5ea] rounded px-1">↵</kbd>
+                abrir
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock size={10} />
+                recientes al abrir
+              </span>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

@@ -32,6 +32,23 @@ const UserSchema = new Schema<IUser>(
       type: Date,
       select: false,
     },
+    // Favoritos: strings con formato "tipo:id" (project|board|note)
+    favorites: {
+      type: [String],
+      default: [],
+    },
+    emailVerified: {
+      type: Date,
+      default: null,
+    },
+    verifyEmailToken: {
+      type: String,
+      select: false,
+    },
+    verifyEmailExpires: {
+      type: Date,
+      select: false,
+    },
   },
   {
     timestamps: true,

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, UserPlus, FileText } from 'lucide-react';
+import { Plus, Share2, FileText } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import CreateBoardModal from '@/components/dashboard/CreateBoardModal';
-import InviteMemberModal from '@/components/project/InviteMemberModal';
+import ShareDialog from '@/components/share/ShareDialog';
 import CreateNoteModal from '@/components/notes/CreateNoteModal';
 import { IProject } from '@/types';
 
@@ -15,6 +15,7 @@ interface ParentProjectClientProps {
   mode?: 'board' | 'share' | 'note';
   ownerEmail?: string;
   ownerName?: string;
+  canEdit?: boolean;
 }
 
 export default function ParentProjectClient({
@@ -23,7 +24,8 @@ export default function ParentProjectClient({
   project,
   mode = 'board',
   ownerEmail,
-  ownerName
+  ownerName,
+  canEdit = true
 }: ParentProjectClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -35,20 +37,24 @@ export default function ParentProjectClient({
           size="sm"
           variant="ghost"
         >
-          <UserPlus size={15} className="mr-1.5" />
-          Invitar
+          <Share2 size={15} className="mr-1.5" />
+          Compartir
         </Button>
 
-        <InviteMemberModal
+        <ShareDialog
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          project={project}
+          resourceType="project"
+          resourceId={parentId}
+          resourceName={project.name}
+          ownerId={project.owner.toString()}
         />
       </>
     );
   }
 
   if (mode === 'note') {
+    if (!canEdit) return null;
     return (
       <>
         <div className="flex justify-start">
@@ -73,6 +79,8 @@ export default function ParentProjectClient({
       </>
     );
   }
+
+  if (!canEdit) return null;
 
   return (
     <>

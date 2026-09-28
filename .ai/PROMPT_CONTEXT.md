@@ -9,7 +9,7 @@ Para este proyecto, lee y respeta siempre los archivos locales en el orden indic
 5. **DESIGN.md** - Sistema de diseño Apple (colores, tipografía, componentes)
 
 ## Proyecto
-**Notefy** es un administrador de proyectos multiproyecto con:
+**Harold** es un administrador de proyectos multiproyecto con:
 - Tableros Kanban con drag & drop (@hello-pangea/dnd)
 - Sistema de notas con editor de texto rico (TipTap)
 - Calendario de tareas (react-big-calendar)

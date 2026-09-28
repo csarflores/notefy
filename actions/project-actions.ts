@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import connectDB from '@/lib/mongodb';
 import Project from '@/models/Project';
-import { CreateProjectInput, UpdateProjectInput, ApiResponse, IProject, IUser } from '@/types';
+import { CreateProjectInput, UpdateProjectInput, ApiResponse, IProject, IUser, MemberRole } from '@/types';
+import { createInvitation } from '@/actions/invitation-actions';
 import {
   getAuthUser,
   isSelf,
@@ -23,6 +24,7 @@ export async function getUserProjects(userId: string): Promise<ApiResponse<IProj
 
     // Buscar proyectos donde el usuario es owner O está en members
     const projects = await Project.find({
+      deletedAt: null,
       $or: [
         { owner: userId },
         { members: user.email }
@@ -148,7 +150,7 @@ export async function deleteProject(projectId: string): Promise<ApiResponse<null
       return { success: false, error: 'Proyecto no encontrado o sin permisos' };
     }
 
-    // Actualizar tableros y notas para que queden sin proyecto
+    // Soft-delete: el proyecto va a la papelera; tableros y notas quedan sin proyecto
     const Board = (await import('@/models/Board')).default;
     const Note = (await import('@/models/Note')).default;
     await Promise.all([
@@ -156,7 +158,8 @@ export async function deleteProject(projectId: string): Promise<ApiResponse<null
       Note.updateMany({ projectId: projectId }, { $set: { projectId: null } }),
     ]);
 
-    await Project.findByIdAndDelete(projectId);
+    project.deletedAt = new Date();
+    await project.save();
 
     revalidatePath('/dashboard');
 
@@ -167,47 +170,15 @@ export async function deleteProject(projectId: string): Promise<ApiResponse<null
   }
 }
 
-// Agregar miembro al proyecto (solo el propietario)
+// Invitar miembro al proyecto (solo el propietario) — crea invitación pendiente
 export async function addProjectMember(
   projectId: string,
-  email: string
-): Promise<ApiResponse<IProject>> {
-  try {
-    const user = await getAuthUser();
-    if (!user) {
-      return { success: false, error: 'No autenticado' };
-    }
-
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      return { success: false, error: 'Email inválido' };
-    }
-
-    const project = await findOwnedProject(projectId, user);
-    if (!project) {
-      return { success: false, error: 'Proyecto no encontrado o sin permisos' };
-    }
-
-    if (project.members.includes(email)) {
-      return { success: false, error: 'El miembro ya está en el proyecto' };
-    }
-
-    project.members.push(email);
-    await project.save();
-
-    // También agregar el miembro a todos los tableros del proyecto
-    const Board = (await import('@/models/Board')).default;
-    await Board.updateMany(
-      { projectId: projectId },
-      { $addToSet: { members: email } }
-    );
-
-    revalidatePath(`/parent-project/${projectId}`);
-
-    return { success: true, data: JSON.parse(JSON.stringify(project)) };
-  } catch (error) {
-    console.error('Error al agregar miembro:', error);
-    return { success: false, error: 'Error al agregar el miembro' };
-  }
+  email: string,
+  role: MemberRole = 'editor'
+): Promise<ApiResponse<null>> {
+  const result = await createInvitation('project', projectId, email, role);
+  if (result.success) revalidatePath(`/parent-project/${projectId}`);
+  return { success: result.success, data: null, error: result.error };
 }
 
 // Eliminar miembro del proyecto (solo el propietario)
@@ -227,6 +198,7 @@ export async function removeProjectMember(
     }
 
     project.members = project.members.filter((member) => member !== email);
+    project.memberRoles?.delete(email);
     await project.save();
 
     // También eliminar el miembro de todos los tableros del proyecto
@@ -235,6 +207,14 @@ export async function removeProjectMember(
       { projectId: projectId },
       { $pull: { members: email } }
     );
+    // Limpiar el rol en los tableros del proyecto
+    const boards = await Board.find({ projectId, memberRoles: { $exists: true } });
+    for (const board of boards) {
+      if (board.memberRoles?.has(email)) {
+        board.memberRoles.delete(email);
+        await board.save();
+      }
+    }
 
     revalidatePath(`/parent-project/${projectId}`);
 

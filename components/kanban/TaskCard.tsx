@@ -7,9 +7,29 @@ import { ITask, IUser } from '@/types';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import EditTaskModal from './EditTaskModal';
-import { MoreVertical, Edit2, Trash2, Check, Calendar, Clock } from 'lucide-react';
+import TaskDetailPanel from './TaskDetailPanel';
+import { PriorityFlag } from './PriorityPicker';
+import { MoreVertical, Edit2, Trash2, Check, Calendar, Clock, MessageSquare, Paperclip, ListChecks } from 'lucide-react';
 import { deleteTask } from '@/actions/task-actions';
+import { useNotification } from '@/components/ui/NotificationContext';
+
+function getDateTone(dateStr: string | Date, isDone: boolean): 'overdue' | 'today' | 'normal' {
+  if (isDone) return 'normal';
+  const date = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  if (d.getTime() < today.getTime()) return 'overdue';
+  if (d.getTime() === today.getTime()) return 'today';
+  return 'normal';
+}
+
+const DATE_TONE_CLASSES = {
+  overdue: 'text-[#e03131] font-medium',
+  today: 'text-[#e8590c] font-medium',
+  normal: 'text-[#7a7a7a]',
+};
 
 interface TaskCardProps {
   task: ITask;
@@ -17,10 +37,15 @@ interface TaskCardProps {
   selectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelection?: (taskId: string) => void;
+  isDone?: boolean;
+  canEdit?: boolean;
+  canComment?: boolean;
 }
 
-export default function TaskCard({ task, canDelete = false, selectionMode = false, isSelected = false, onToggleSelection }: TaskCardProps) {
+export default function TaskCard({ task, canDelete = false, selectionMode = false, isSelected = false, onToggleSelection, isDone, canEdit = true, canComment = true }: TaskCardProps) {
+  const taskDone = isDone ?? task.status === 'done';
   const router = useRouter();
+  const { showNotification } = useNotification();
   const assignedUsers = task.assignedTo as unknown as IUser[];
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -35,9 +60,10 @@ export default function TaskCard({ task, canDelete = false, selectionMode = fals
       const result = await deleteTask(task._id.toString());
       if (result.success) {
         setShowDeleteDialog(false);
+        showNotification('Tarea eliminada', 'success');
         router.refresh();
       } else {
-        window.alert(result.error || 'Error al eliminar la tarea');
+        showNotification(result.error || 'Error al eliminar la tarea', 'error');
       }
     } catch (error) {
       console.error('Error al eliminar tarea:', error);
@@ -79,7 +105,6 @@ export default function TaskCard({ task, canDelete = false, selectionMode = fals
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onClick={handleClick}
-        title={task.description || undefined}
       >
         {/* Checkbox de selección */}
         {selectionMode && canDelete && (
@@ -105,27 +130,54 @@ export default function TaskCard({ task, canDelete = false, selectionMode = fals
           </div>
         )}
 
-        {/* Título */}
-        <h4 className="text-[14px] sm:text-[14px] font-semibold text-[#1d1d1f] mb-1.5 line-clamp-2 tracking-[-0.224px]">
-          {task.title}
-        </h4>
+        {/* Título + prioridad */}
+        <div className="flex items-start gap-1.5 mb-1.5 pr-6">
+          {task.priority && <PriorityFlag priority={task.priority} size={12} />}
+          <h4 className="text-[14px] sm:text-[14px] font-semibold text-[#1d1d1f] line-clamp-2 tracking-[-0.224px]">
+            {task.title}
+          </h4>
+        </div>
 
         {/* Fechas */}
         {(task.dueDate || task.deliveryDate) && (
           <div className="flex flex-row gap-1 mb-2 text-[10px] sm:text-[12px]">
             {task.dueDate && (
-              <div className="flex items-center gap-1 text-[#7a7a7a] tracking-[-0.08px]">
+              <div className={`flex items-center gap-1 tracking-[-0.08px] ${DATE_TONE_CLASSES[getDateTone(task.dueDate, taskDone)]}`}>
                 <Calendar size={10} className="sm:hidden" />
                 <Calendar size={12} className="hidden sm:block" />
                 <span className="truncate">Máx: {new Date(task.dueDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</span>
               </div>
             )}
             {task.deliveryDate && (
-              <div className="flex items-center gap-1 text-[#7a7a7a] tracking-[-0.08px]">
+              <div className={`flex items-center gap-1 tracking-[-0.08px] ${DATE_TONE_CLASSES[getDateTone(task.deliveryDate, taskDone)]}`}>
                 <Clock size={10} className="sm:hidden" />
                 <Clock size={12} className="hidden sm:block" />
                 <span className="truncate">Entrega: {new Date(task.deliveryDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</span>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Indicadores: checklist, comentarios, adjuntos */}
+        {((task.checklist && task.checklist.length > 0) || (task.comments && task.comments.length > 0) || (task.attachments && task.attachments.length > 0)) && (
+          <div className="flex items-center gap-2.5 mb-1 text-[#8e8e93]">
+            {task.checklist && task.checklist.length > 0 && (
+              <span className="flex items-center gap-0.5 text-[11px]">
+                <ListChecks size={12} />
+                {task.checklist.filter((c) => c.done).length}/{task.checklist.length}
+              </span>
+            )}
+            {task.comments && task.comments.length > 0 && (
+              <span className="flex items-center gap-0.5 text-[11px]">
+                <MessageSquare size={11} />
+                {task.comments.length}
+              </span>
+            )}
+            {task.attachments && task.attachments.length > 0 && (
+              <span className="flex items-center gap-0.5 text-[11px]">
+                <Paperclip size={11} />
+                {task.attachments.length}
+              </span>
             )}
           </div>
         )}
@@ -212,11 +264,13 @@ export default function TaskCard({ task, canDelete = false, selectionMode = fals
         </div>
       </div>
 
-      {/* Modal de edición */}
-      <EditTaskModal
+      {/* Panel de edición */}
+      <TaskDetailPanel
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
         task={task}
+        canEdit={canEdit}
+        canComment={canComment}
       />
 
       {/* Diálogo de confirmación de eliminación */}

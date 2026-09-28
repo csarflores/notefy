@@ -19,7 +19,7 @@ export function getS3Client(): S3Client {
 }
 
 export const S3_BUCKET = process.env.AWS_S3_BUCKET || '';
-export const S3_KEY_PREFIX = (process.env.AWS_S3_PREFIX || 'notefy').replace(/^\/+|\/+$/g, '');
+export const S3_KEY_PREFIX = (process.env.AWS_S3_PREFIX || 'harold').replace(/^\/+|\/+$/g, '');
 export const CLOUDFRONT_URL = (process.env.NEXT_PUBLIC_CLOUDFRONT_URL || '').replace(/\/+$/, '');
 
 // Borra todos los objetos bajo un prefijo (paginado, nunca lanza)

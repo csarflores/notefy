@@ -8,9 +8,10 @@ import { INote } from '@/types';
 interface ProjectNotesClientProps {
   notes: Array<{ note: INote; ownerEmail: string; ownerName: string }>;
   userId: string;
+  favorites?: string[];
 }
 
-export default function ProjectNotesClient({ notes, userId }: ProjectNotesClientProps) {
+export default function ProjectNotesClient({ notes, userId, favorites = [] }: ProjectNotesClientProps) {
   const [selectedNote, setSelectedNote] = useState<INote | null>(null);
   const [selectedOwnerEmail, setSelectedOwnerEmail] = useState<string>('');
   const [selectedOwnerName, setSelectedOwnerName] = useState<string>('');
@@ -31,7 +32,8 @@ export default function ProjectNotesClient({ notes, userId }: ProjectNotesClient
             key={note._id.toString()}
             note={note}
             onOpenNote={() => handleNoteClick(note, ownerEmail, ownerName)}
-            isOwner={true}
+            isOwner={note.owner.toString() === userId}
+            isFavorite={favorites.includes(`note:${note._id.toString()}`)}
           />
         ))}
       </div>

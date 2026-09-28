@@ -29,6 +29,11 @@ const ProjectSchema = new Schema<IProject>(
         message: 'Todos los miembros deben tener emails válidos',
       },
     },
+    memberRoles: {
+      type: Map,
+      of: { type: String, enum: ['viewer', 'commenter', 'editor'] },
+      default: {},
+    },
     color: {
       type: String,
       default: '#0066cc',
@@ -38,6 +43,10 @@ const ProjectSchema = new Schema<IProject>(
         },
         message: 'El color debe ser un código hexadecimal válido (ej: #0066cc)',
       },
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

@@ -1,33 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2, LayoutGrid, Calendar, Tags } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import CreateTaskModal from '@/components/kanban/CreateTaskModal';
-import EditTaskModal from '@/components/kanban/EditTaskModal';
+import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2, LayoutGrid, Calendar, Tags, Folder, Eye, Columns3, Share2, MessageSquare } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import TaskDetailPanel from '@/components/kanban/TaskDetailPanel';
 import EditBoardModal from '@/components/dashboard/EditBoardModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import TagManagerModal from '@/components/kanban/TagManagerModal';
+import ColumnsModal from '@/components/kanban/ColumnsModal';
+import ShareDialog from '@/components/share/ShareDialog';
 import BoardWithFilters from './BoardWithFilters';
 import TaskCalendar from '@/components/calendar/TaskCalendar';
 import { deleteBoard } from '@/actions/board-actions';
 import { updateTask } from '@/actions/task-actions';
-import { IBoard, ITask, IUser, ITag } from '@/types';
+import { IBoard, ITask, IUser, ITag, MemberRole } from '@/types';
 
 interface BoardClientProps {
   board: IBoard;
   tasks: ITask[];
   boardUsers: IUser[];
   boardTags: ITag[];
+  projectName?: string;
 }
 
 type ViewType = 'kanban' | 'calendar';
 
-export default function BoardClient({ board, tasks, boardUsers, boardTags }: BoardClientProps) {
+export default function BoardClient({ board, tasks, boardUsers, boardTags, projectName }: BoardClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const isBoardOwner = board.owner?.toString() === session?.user?.id;
+  // memberRoles se serializa como objeto plano desde el servidor
+  const memberRoles = (board.memberRoles ?? {}) as unknown as Record<string, MemberRole>;
+  const myRole: 'owner' | MemberRole = isBoardOwner
+    ? 'owner'
+    : (memberRoles[session?.user?.email?.toLowerCase() ?? ''] ?? 'editor');
+  const canEdit = myRole === 'owner' || myRole === 'editor';
+  const canComment = canEdit || myRole === 'commenter';
   const [view, setView] = useState<ViewType>('kanban');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [showBoardMenu, setShowBoardMenu] = useState(false);
@@ -36,6 +46,18 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingTask, setEditingTask] = useState<ITask | null>(null);
   const [showTagManager, setShowTagManager] = useState(false);
+  const [showColumnsModal, setShowColumnsModal] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+
+  // Deep-link: abrir una tarea puntual via ?task=<id> (ej. desde la búsqueda)
+  useEffect(() => {
+    const taskId = searchParams.get('task');
+    if (!taskId) return;
+    const task = tasks.find((t) => t._id.toString() === taskId);
+    if (task) setEditingTask(task);
+  // Solo al montar con las tareas iniciales
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDeleteBoard = async () => {
     setIsDeleting(true);
@@ -53,6 +75,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
   };
 
   const handleEventDrop = async (task: ITask, newDate: Date) => {
+    if (!canEdit) return;
     await updateTask(task._id.toString(), { deliveryDate: newDate.toISOString() });
     router.refresh();
   };
@@ -74,8 +97,20 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
           {/* Separador */}
           <div className="w-px h-4 bg-[#e5e5e5] shrink-0" />
 
-          {/* Título */}
-          <div className="flex items-center gap-2 min-w-0 flex-1 px-1">
+          {/* Breadcrumb + Título */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1 px-1">
+            {projectName && (
+              <>
+                <button
+                  onClick={() => router.push(`/parent-project/${board.projectId}`)}
+                  className="hidden sm:flex items-center gap-1 text-[12px] text-[#a0a0a8] hover:text-[#0066cc] transition-colors shrink-0"
+                >
+                  <Folder size={11} />
+                  <span className="max-w-[140px] truncate">{projectName}</span>
+                </button>
+                <span className="hidden sm:inline text-[#d1d1d6] text-[12px] shrink-0">/</span>
+              </>
+            )}
             <span className="text-[14px] font-semibold text-[#1d1d1f] tracking-tight truncate leading-none">
               {board.name}
             </span>
@@ -83,6 +118,18 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
               <Users size={10} />
               {board.members.length}
             </span>
+            {myRole === 'viewer' && (
+              <span className="flex items-center gap-1 shrink-0 text-[11px] text-[#b36400] bg-[#fff4e0] px-1.5 py-0.5 rounded-md font-medium">
+                <Eye size={10} />
+                Solo lectura
+              </span>
+            )}
+            {myRole === 'commenter' && (
+              <span className="flex items-center gap-1 shrink-0 text-[11px] text-[#0066cc] bg-[#e8f0fb] px-1.5 py-0.5 rounded-md font-medium">
+                <MessageSquare size={10} />
+                Comentarista
+              </span>
+            )}
           </div>
 
           {/* Toggle de vista */}
@@ -112,6 +159,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
           </div>
 
           {/* Nueva tarea */}
+          {canEdit && (
           <button
             onClick={() => setIsTaskModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0066cc] hover:bg-[#0055b3] active:bg-[#004499] text-white rounded-lg text-[12px] font-medium transition-colors shrink-0 shadow-sm"
@@ -119,8 +167,20 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
             <Plus size={13} strokeWidth={2.5} />
             <span className="hidden sm:inline">Nueva Tarea</span>
           </button>
+          )}
 
-          {/* Menú de opciones */}
+          {/* Compartir */}
+          <button
+            onClick={() => setShowShareDialog(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-[#7a7a7a] hover:bg-[#f5f5f7] hover:text-[#1d1d1f] transition-colors shrink-0"
+            title="Compartir tablero"
+          >
+            <Share2 size={13} />
+            <span className="hidden sm:inline">Compartir</span>
+          </button>
+
+          {/* Menú de opciones (oculto para viewer/commenter) */}
+          {canEdit && (
           <div className="relative shrink-0">
             <button
               onClick={() => setShowBoardMenu(!showBoardMenu)}
@@ -136,6 +196,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
                 <div className="fixed inset-0 z-40" onClick={() => setShowBoardMenu(false)} />
                 <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-[#e5e5e5] overflow-hidden z-50">
                   <div className="p-1">
+                    {isBoardOwner && (
                     <button
                       onClick={() => { setShowBoardMenu(false); setShowEditModal(true); }}
                       className="w-full px-3 py-2 text-left text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2.5 rounded-lg transition-colors"
@@ -143,6 +204,9 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
                       <Edit2 size={13} className="text-[#7a7a7a]" />
                       Editar tablero
                     </button>
+                    )}
+                    {canEdit && (
+                    <>
                     <button
                       onClick={() => { setShowBoardMenu(false); setShowTagManager(true); }}
                       className="w-full px-3 py-2 text-left text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2.5 rounded-lg transition-colors"
@@ -150,6 +214,15 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
                       <Tags size={13} className="text-[#7a7a7a]" />
                       Administrar etiquetas
                     </button>
+                    <button
+                      onClick={() => { setShowBoardMenu(false); setShowColumnsModal(true); }}
+                      className="w-full px-3 py-2 text-left text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2.5 rounded-lg transition-colors"
+                    >
+                      <Columns3 size={13} className="text-[#7a7a7a]" />
+                      Personalizar columnas
+                    </button>
+                    </>
+                    )}
                   </div>
                   {isBoardOwner && (
                     <>
@@ -169,6 +242,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
               </>
             )}
           </div>
+          )}
         </div>
       </div>
 
@@ -180,6 +254,9 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
           boardOwnerId={board.owner.toString()}
           boardUsers={boardUsers}
           boardTags={boardTags}
+          canEdit={canEdit}
+          canComment={canComment}
+          columns={board.columns}
         />
       ) : (
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
@@ -188,25 +265,39 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
             onTaskClick={(task) => setEditingTask(task)}
             onEventDrop={handleEventDrop}
             hideProjectFilter={true}
+            canDrag={canEdit}
           />
         </div>
       )}
 
-      {/* Modal de crear tarea */}
-      <CreateTaskModal
+      {/* Panel de crear tarea */}
+      <TaskDetailPanel
         isOpen={isTaskModalOpen}
         onClose={() => setIsTaskModalOpen(false)}
-        projectId={board._id.toString()}
+        boardId={board._id.toString()}
+        columns={board.columns}
       />
 
-      {/* Modal de editar tarea (desde calendario) */}
+      {/* Panel de editar tarea (desde calendario) */}
       {editingTask && (
-        <EditTaskModal
+        <TaskDetailPanel
           isOpen={!!editingTask}
           onClose={() => setEditingTask(null)}
           task={editingTask}
+          canEdit={canEdit}
+          canComment={canComment}
         />
       )}
+
+      {/* Diálogo de compartir */}
+      <ShareDialog
+        isOpen={showShareDialog}
+        onClose={() => setShowShareDialog(false)}
+        resourceType="board"
+        resourceId={board._id.toString()}
+        resourceName={board.name}
+        ownerId={board.owner.toString()}
+      />
 
       {/* Modal de editar tablero */}
       <EditBoardModal
@@ -222,6 +313,14 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags }: Boa
         boardId={board._id.toString()}
         initialTags={boardTags}
         canDeleteTags={isBoardOwner}
+      />
+
+      {/* Modal de columnas personalizables */}
+      <ColumnsModal
+        isOpen={showColumnsModal}
+        onClose={() => setShowColumnsModal(false)}
+        boardId={board._id.toString()}
+        initialColumns={board.columns}
       />
 
       {/* Diálogo de confirmación de eliminación */}

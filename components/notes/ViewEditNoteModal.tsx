@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import NoteEditor from './NoteEditor';
-import { Trash2, Lock, Users, Save, X, Palette } from 'lucide-react';
+import { Trash2, Lock, Users, Save, X, Palette, Share2 } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import { INote } from '@/types';
-import { updateNote, deleteNote, shareNote, removeNoteMember } from '@/actions/note-actions';
+import { INote, MemberRole } from '@/types';
+import { updateNote, deleteNote } from '@/actions/note-actions';
 import { useNotification } from '@/components/ui/NotificationContext';
-import ConfirmModal from '@/components/ui/ConfirmModal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import ShareDialog from '@/components/share/ShareDialog';
 import { PROJECT_COLORS } from '@/constants/project-colors';
 
 interface ViewEditNoteModalProps {
@@ -22,24 +24,32 @@ interface ViewEditNoteModalProps {
 
 export default function ViewEditNoteModal({ isOpen, onClose, note, userId, ownerEmail, ownerName }: ViewEditNoteModalProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const { showNotification } = useNotification();
   const [content, setContent] = useState(note.content);
-  const [visibility, setVisibility] = useState<'private' | 'shared'>(note.visibility as 'private' | 'shared');
   const [color, setColor] = useState(note.color || '#f59e0b');
-  const [memberEmail, setMemberEmail] = useState('');
-  const [members, setMembers] = useState<string[]>(note.members || []);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+
+  // Rol del usuario actual sobre la nota (memberRoles llega serializado como objeto plano)
+  const isNoteOwner = note.owner?.toString() === userId;
+  const memberRoles = (note.memberRoles ?? {}) as unknown as Record<string, MemberRole>;
+  const email = session?.user?.email?.toLowerCase() ?? '';
+  const myRole: MemberRole | 'owner' = isNoteOwner
+    ? 'owner'
+    : note.members?.includes(email)
+      ? (memberRoles[email] ?? 'editor')
+      : 'viewer';
+  const canEditNote = myRole === 'owner' || myRole === 'editor';
+  const isShared = note.visibility === 'shared';
 
   // Actualizar el contenido cuando la nota cambia
   useEffect(() => {
     setContent(note.content);
-    setVisibility(note.visibility as 'private' | 'shared');
     setColor(note.color || '#f59e0b');
-    setMembers(note.members || []);
   }, [note]);
 
   const handleSave = async () => {
@@ -47,9 +57,7 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
     try {
       const result = await updateNote(note._id.toString(), userId, {
         content,
-        visibility,
         color,
-        members,
       });
       if (result.success) {
       } else {
@@ -59,55 +67,6 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
       showNotification('Error al guardar la nota', 'error');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const addMember = async () => {
-    if (memberEmail && /^\S+@\S+\.\S+$/.test(memberEmail) && !members.includes(memberEmail)) {
-      setIsSharing(true);
-      try {
-        const result = await shareNote(note._id.toString(), userId, memberEmail);
-        if (result.success) {
-          setMembers([...members, memberEmail]);
-          setMemberEmail('');
-          if (visibility === 'private') {
-            setVisibility('shared');
-          }
-        } else {
-          showNotification(result.error || 'Error al compartir la nota', 'error');
-        }
-      } catch {
-        showNotification('Error al compartir la nota', 'error');
-      } finally {
-        setIsSharing(false);
-      }
-    } else {
-      if (!memberEmail) {
-        showNotification('Por favor ingresa un email', 'error');
-      } else if (!/^\S+@\S+\.\S+$/.test(memberEmail)) {
-        showNotification('Email inválido', 'error');
-      } else if (members.includes(memberEmail)) {
-        showNotification('El usuario ya tiene acceso a esta nota', 'error');
-      }
-    }
-  };
-
-  const removeMember = async (email: string) => {
-    setIsSharing(true);
-    try {
-      const result = await removeNoteMember(note._id.toString(), userId, email);
-      if (result.success) {
-        setMembers(members.filter(m => m !== email));
-        if (members.length === 1) {
-          setVisibility('private');
-        }
-      } else {
-        showNotification(result.error || 'Error al eliminar el miembro', 'error');
-      }
-    } catch {
-      showNotification('Error al eliminar el miembro', 'error');
-    } finally {
-      setIsSharing(false);
     }
   };
 
@@ -124,9 +83,11 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
         onClose();
         router.refresh();
       } else {
+        setIsConfirmModalOpen(false);
         showNotification(result.error || 'Error al eliminar la nota', 'error');
       }
     } catch {
+      setIsConfirmModalOpen(false);
       showNotification('Error al eliminar la nota', 'error');
     } finally {
       setIsDeleting(false);
@@ -146,10 +107,10 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
                 {/* Información de la nota */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-3">
-                    {visibility === 'private' ? (
-                      <Lock size={16} className="text-[#7a7a7a] shrink-0" />
-                    ) : (
+                    {isShared ? (
                       <Users size={16} className="text-[#0066cc] shrink-0" />
+                    ) : (
+                      <Lock size={16} className="text-[#7a7a7a] shrink-0" />
                     )}
                     <h1 className="text-[20px] sm:text-[24px] font-semibold text-[#1d1d1f] tracking-tight truncate">
                       {note.title}
@@ -161,7 +122,8 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
                     Propietario: {ownerName || ownerEmail || 'Usuario'}
                   </div>
 
-                  {/* Selector de Color */}
+                  {/* Selector de Color (solo quien puede editar) */}
+                  {canEditNote && (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-3">
                       <button
@@ -203,99 +165,41 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
                       </div>
                     )}
                   </div>
-
-                  {/* Controles de visibilidad */}
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="visibility"
-                          value="private"
-                          checked={visibility === 'private'}
-                          onChange={(e) => setVisibility(e.target.value as 'private' | 'shared')}
-                          className="w-4 h-4 text-gray-400 focus:ring-gray-300"
-                        />
-                        <span className="text-xs text-gray-500">Privada</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="visibility"
-                          value="shared"
-                          checked={visibility === 'shared'}
-                          onChange={(e) => setVisibility(e.target.value as 'private' | 'shared')}
-                          className="w-4 h-4 text-gray-400 focus:ring-gray-300"
-                        />
-                        <span className="text-xs text-gray-500">Compartida</span>
-                      </label>
-                    </div>
-
-                    {/* Campo para agregar miembros si es compartida */}
-                    {visibility === 'shared' && (
-                      <div className="flex flex-col gap-2">
-                        {members.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {members.map((email) => (
-                              <span
-                                key={email}
-                                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full"
-                              >
-                                {email}
-                                <button
-                                  type="button"
-                                  onClick={() => removeMember(email)}
-                                  className="text-gray-400 hover:text-gray-600"
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 max-w-3/4">
-                          <input
-                            type="email"
-                            value={memberEmail}
-                            onChange={(e) => setMemberEmail(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addMember())}
-                            placeholder="Agregar email..."
-                            className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 bg-gray-50"
-                          />
-                          <Button
-                            onClick={addMember}
-                            disabled={isSharing}
-                            isLoading={isSharing}
-                            size="sm"
-                          >
-                            Agregar
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
 
               {/* Controles en la esquina superior derecha */}
               <div className="flex items-center gap-2 shrink-0 pt-2 top-0 right-0 relative">
-                <Button
-                  onClick={handleSave}
-                  size="sm"
-                  isLoading={isSaving}
-                  className="text-[13px] py-1.5"
-                >
-                  <Save size={15} className="mr-1.5" />
-                  Guardar
-                </Button>
                 <button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="p-1.5 hover:bg-red-50 rounded-full transition-colors disabled:opacity-50"
-                  title="Eliminar"
+                  onClick={() => setShareDialogOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-[#7a7a7a] hover:bg-[#f5f5f7] hover:text-[#1d1d1f] transition-colors"
+                  title="Compartir nota"
                 >
-                  <Trash2 size={18} className="text-red-500" />
+                  <Share2 size={15} />
+                  <span className="hidden sm:inline">Compartir</span>
                 </button>
+                {canEditNote && (
+                  <Button
+                    onClick={handleSave}
+                    size="sm"
+                    isLoading={isSaving}
+                    className="text-[13px] py-1.5"
+                  >
+                    <Save size={15} className="mr-1.5" />
+                    Guardar
+                  </Button>
+                )}
+                {isNoteOwner && (
+                  <button
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="p-1.5 hover:bg-red-50 rounded-full transition-colors disabled:opacity-50"
+                    title="Eliminar"
+                  >
+                    <Trash2 size={18} className="text-red-500" />
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
@@ -314,7 +218,7 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
             <NoteEditor
               content={content}
               onChange={setContent}
-              editable={true}
+              editable={canEditNote}
               placeholder="Escribe el contenido de tu nota..."
               uploadScope="note-image"
               uploadResourceId={note._id.toString()}
@@ -322,14 +226,25 @@ export default function ViewEditNoteModal({ isOpen, onClose, note, userId, owner
           </div>
         </div>
       </div>
-      <ConfirmModal
+      {/* Diálogo de compartir */}
+      <ShareDialog
+        isOpen={shareDialogOpen}
+        onClose={() => setShareDialogOpen(false)}
+        resourceType="note"
+        resourceId={note._id.toString()}
+        resourceName={note.title}
+        ownerId={note.owner.toString()}
+        notePublicToken={note.publicToken}
+      />
+      <ConfirmDialog
         isOpen={isConfirmModalOpen}
         onClose={() => setIsConfirmModalOpen(false)}
         onConfirm={handleConfirmDelete}
         title="Eliminar nota"
-        message="¿Estás seguro de que quieres eliminar esta nota?"
+        message="¿Estás seguro de que quieres eliminar esta nota? Esta acción no se puede deshacer."
         confirmText="Eliminar"
         cancelText="Cancelar"
+        isLoading={isDeleting}
         variant="danger"
       />
     </div>

@@ -42,6 +42,11 @@ export function truncate(text: string, maxLength: number): string {
   return text.slice(0, maxLength) + '...';
 }
 
+// Escapar caracteres especiales de una cadena para usar en RegExp
+export function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Obtener iniciales de un nombre
 export function getInitials(name: string): string {
   return name

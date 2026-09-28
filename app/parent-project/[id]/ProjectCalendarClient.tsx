@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import TaskCalendar from '@/components/calendar/TaskCalendar';
-import EditTaskModal from '@/components/kanban/EditTaskModal';
+import TaskDetailPanel from '@/components/kanban/TaskDetailPanel';
 import { ITask } from '@/types';
 import { getProjectTasksWithDeliveryDate, updateTaskDeliveryDate } from '@/actions/calendar-actions';
+import { getMyTaskPermissions } from '@/actions/task-actions';
 
 interface ProjectCalendarClientProps {
   projectId: string;
@@ -16,6 +17,7 @@ export default function ProjectCalendarClient({ projectId, userId }: ProjectCale
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<ITask | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [taskPerms, setTaskPerms] = useState({ canEdit: false, canComment: false });
 
   const loadTasks = useCallback(async () => {
     try {
@@ -34,13 +36,18 @@ export default function ProjectCalendarClient({ projectId, userId }: ProjectCale
     loadTasks();
   }, [loadTasks]);
 
-  const handleTaskClick = (task: ITask) => {
+  const handleTaskClick = async (task: ITask) => {
     if (!task) {
       console.error('Task is undefined', task);
       return;
     }
+    setTaskPerms({ canEdit: false, canComment: false });
     setSelectedTask(task);
     setIsModalOpen(true);
+    const result = await getMyTaskPermissions(task._id.toString());
+    if (result.success && result.data) {
+      setTaskPerms(result.data);
+    }
   };
 
   const handleCloseModal = () => {
@@ -85,10 +92,12 @@ export default function ProjectCalendarClient({ projectId, userId }: ProjectCale
         hideProjectFilter
       />
       {selectedTask && (
-        <EditTaskModal
+        <TaskDetailPanel
           isOpen={isModalOpen}
           onClose={handleCloseModal}
           task={selectedTask}
+          canEdit={taskPerms.canEdit}
+          canComment={taskPerms.canComment}
         />
       )}
     </>

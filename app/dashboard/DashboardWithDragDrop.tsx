@@ -15,14 +15,19 @@ interface DashboardWithDragDropProps {
   unassignedBoards: Array<{ item: IBoard }>;
   notes: Array<{ note: INote; ownerEmail: string; ownerName: string }>;
   userId: string;
+  favorites?: string[];
+  progress?: Record<string, { total: number; done: number }>;
 }
 
 export default function DashboardWithDragDrop({
   projects,
   unassignedBoards,
   notes,
-  userId
+  userId,
+  favorites = [],
+  progress = {}
 }: DashboardWithDragDropProps) {
+  const favSet = new Set(favorites);
   const router = useRouter();
   const { showNotification } = useNotification();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -67,17 +72,15 @@ export default function DashboardWithDragDrop({
   };
 
   const handleBoardReorder = async (draggedBoardId: string, targetIndex: number, projectId?: string | null) => {
-    
+
     if (isUpdating) {
       return;
     }
 
     setIsUpdating(true);
     try {
-      // Obtener los tableros actuales
-      const currentBoards = projectId 
-        ? unassignedBoards.filter(b => b.item.projectId?.toString() === projectId)
-        : unassignedBoards;
+      // Tableros del grupo que se reordena (dashboard solo ordena los sin proyecto)
+      const currentBoards = unassignedBoards;
 
       // Encontrar el tablero arrastrado
       const draggedBoard = currentBoards.find(b => b.item._id.toString() === draggedBoardId);
@@ -133,12 +136,16 @@ export default function DashboardWithDragDrop({
             Proyectos
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
-            {projects.map(({ item, childCount }) => (
+            {[...projects]
+              .sort((a, b) => Number(favSet.has(`project:${b.item._id.toString()}`)) - Number(favSet.has(`project:${a.item._id.toString()}`)))
+              .map(({ item, childCount }) => (
               <ProjectCard
                 key={item._id.toString()}
                 project={item}
                 boardCount={childCount}
                 onBoardDrop={handleBoardDrop}
+                isFavorite={favSet.has(`project:${item._id.toString()}`)}
+                progress={progress[item._id.toString()]}
               />
             ))}
           </div>
@@ -165,7 +172,8 @@ export default function DashboardWithDragDrop({
                 onDragStart={handleBoardDragStart}
                 onDragEnd={handleBoardDragEnd}
                 onDrop={handleBoardDropWrapper}
-                isDragOver={draggedBoard?.projectId === null || false}
+                dragOverCompatible={!!draggedBoard && (draggedBoard.projectId || null) === (item.projectId?.toString() || null)}
+                isFavorite={favSet.has(`board:${item._id.toString()}`)}
               />
             ))}
           </div>
@@ -184,9 +192,10 @@ export default function DashboardWithDragDrop({
                 key={note._id.toString()}
                 note={note}
                 onOpenNote={() => handleNoteClick(note, ownerEmail, ownerName)}
-                isOwner={true}
+                isOwner={note.owner.toString() === userId}
                 userId={userId}
                 onDelete={() => router.refresh()}
+                isFavorite={favSet.has(`note:${note._id.toString()}`)}
               />
             ))}
           </div>

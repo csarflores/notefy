@@ -4,14 +4,16 @@ import { revalidatePath } from 'next/cache';
 import connectDB from '@/lib/mongodb';
 import Board from '@/models/Board';
 import Task from '@/models/Task';
-import { CreateBoardInput, UpdateBoardInput, ApiResponse, IBoard, IUser } from '@/types';
+import { CreateBoardInput, UpdateBoardInput, ApiResponse, IBoard, IBoardColumn, IUser, MemberRole } from '@/types';
+import { DEFAULT_COLUMNS, getBoardColumns } from '@/lib/board-columns';
 import { isValidObjectId } from '@/lib/utils';
-import { deleteS3Prefix, S3_KEY_PREFIX } from '@/lib/s3';
+import { createInvitation } from '@/actions/invitation-actions';
 import {
   getAuthUser,
   isSelf,
   findAccessibleBoard,
-  findAccessibleProject,
+  findEditableBoard,
+  findEditableProject,
   findOwnedBoard,
 } from '@/lib/auth-helpers';
 
@@ -29,7 +31,8 @@ export async function getUserBoards(userId: string): Promise<ApiResponse<IBoard[
       $or: [
         { owner: userId },
         { members: user.email }
-      ]
+      ],
+      deletedAt: null,
     })
       .sort({ order: 1, updatedAt: -1 })
       .lean();
@@ -57,6 +60,7 @@ export async function getProjectBoards(projectId: string, userId: string): Promi
 
     const boards = await Board.find({
       projectId: projectId,
+      deletedAt: null,
       $or: [
         { owner: userId },
         { members: user.email }
@@ -90,6 +94,26 @@ export async function getBoardById(boardId: string): Promise<ApiResponse<IBoard>
   } catch (error) {
     console.error('Error al obtener tablero:', error);
     return { success: false, error: 'Error al obtener el tablero' };
+  }
+}
+
+// Obtener las columnas efectivas de un tablero (personalizadas o por defecto)
+export async function getBoardColumnsAction(boardId: string): Promise<ApiResponse<IBoardColumn[]>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const board = await findAccessibleBoard(boardId, user);
+    if (!board) {
+      return { success: false, error: 'Tablero no encontrado' };
+    }
+
+    return { success: true, data: getBoardColumns(board.columns) };
+  } catch (error) {
+    console.error('Error al obtener columnas:', error);
+    return { success: false, error: 'Error al obtener las columnas' };
   }
 }
 
@@ -156,7 +180,7 @@ export async function createBoard(
     let projectMembers: string[] = [];
 
     if (data.projectId) {
-      const project = await findAccessibleProject(data.projectId, user);
+      const project = await findEditableProject(data.projectId, user);
       if (!project) {
         return { success: false, error: 'Proyecto no encontrado' };
       }
@@ -227,7 +251,7 @@ export async function updateBoard(
     }
 
     if (data.projectId) {
-      const project = await findAccessibleProject(data.projectId, user);
+      const project = await findEditableProject(data.projectId, user);
       if (!project) {
         return { success: false, error: 'Proyecto no encontrado' };
       }
@@ -276,12 +300,11 @@ export async function deleteBoard(boardId: string): Promise<ApiResponse<null>> {
       return { success: false, error: 'Tablero no encontrado o sin permisos' };
     }
 
-    const taskIds = await Task.find({ boardId }).select('_id').lean();
-    await Task.deleteMany({ boardId });
-    await Board.findByIdAndDelete(boardId);
-    await Promise.all(
-      taskIds.map((t) => deleteS3Prefix(`${S3_KEY_PREFIX}/tareas/${t._id}/`))
-    );
+    // Soft-delete del tablero y sus tareas (restaurable desde la papelera)
+    const now = new Date();
+    await Task.updateMany({ boardId, deletedAt: null }, { deletedAt: now });
+    board.deletedAt = now;
+    await board.save();
 
     revalidatePath('/dashboard');
     if (board.projectId) {
@@ -295,40 +318,15 @@ export async function deleteBoard(boardId: string): Promise<ApiResponse<null>> {
   }
 }
 
-// Agregar miembro al tablero (solo el propietario)
+// Invitar miembro al tablero (solo el propietario) — crea invitación pendiente
 export async function addBoardMember(
   boardId: string,
-  email: string
-): Promise<ApiResponse<IBoard>> {
-  try {
-    const user = await getAuthUser();
-    if (!user) {
-      return { success: false, error: 'No autenticado' };
-    }
-
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      return { success: false, error: 'Email inválido' };
-    }
-
-    const board = await findOwnedBoard(boardId, user);
-    if (!board) {
-      return { success: false, error: 'Tablero no encontrado o sin permisos' };
-    }
-
-    if (board.members.includes(email)) {
-      return { success: false, error: 'El miembro ya está en el tablero' };
-    }
-
-    board.members.push(email);
-    await board.save();
-
-    revalidatePath(`/board/${boardId}`);
-
-    return { success: true, data: JSON.parse(JSON.stringify(board)) };
-  } catch (error) {
-    console.error('Error al agregar miembro:', error);
-    return { success: false, error: 'Error al agregar el miembro' };
-  }
+  email: string,
+  role: MemberRole = 'editor'
+): Promise<ApiResponse<null>> {
+  const result = await createInvitation('board', boardId, email, role);
+  if (result.success) revalidatePath(`/board/${boardId}`);
+  return { success: result.success, data: null, error: result.error };
 }
 
 // Eliminar miembro del tablero (solo el propietario)
@@ -348,6 +346,7 @@ export async function removeBoardMember(
     }
 
     board.members = board.members.filter((member) => member !== email);
+    board.memberRoles?.delete(email);
     await board.save();
 
     revalidatePath(`/board/${boardId}`);
@@ -396,8 +395,8 @@ export async function reorderBoards(
         .filter((pid): pid is string => !!pid)
     )];
     for (const pid of targetProjectIds) {
-      if (!isValidObjectId(pid) || !(await findAccessibleProject(pid, user))) {
-        return { success: false, error: 'Proyecto de destino no encontrado o sin permisos' };
+      if (!isValidObjectId(pid) || !(await findEditableProject(pid, user))) {
+        return { success: false, error: 'Proyecto de destino no encontrado o sin permisos de edición' };
       }
     }
 
@@ -418,5 +417,207 @@ export async function reorderBoards(
   } catch (error) {
     console.error('Error al reordenar tableros:', error);
     return { success: false, error: 'Error al reordenar los tableros' };
+  }
+}
+
+// Plantillas de tablero: tareas de ejemplo por template
+const BOARD_TEMPLATES: Record<string, { title: string; status: 'todo' | 'in-progress' | 'done'; priority?: 'low' | 'medium' | 'high' }[]> = {
+  sprint: [
+    { title: 'Planificar sprint', status: 'done', priority: 'high' },
+    { title: 'Definir historias de usuario', status: 'in-progress', priority: 'high' },
+    { title: 'Daily standup', status: 'in-progress' },
+    { title: 'Desarrollar funcionalidad principal', status: 'todo', priority: 'medium' },
+    { title: 'Code review', status: 'todo' },
+    { title: 'Demo y retrospectiva', status: 'todo', priority: 'low' },
+  ],
+  personal: [
+    { title: 'Definir objetivos de la semana', status: 'todo', priority: 'medium' },
+    { title: 'Revisar pendientes', status: 'todo' },
+    { title: 'Reservar tiempo de foco', status: 'in-progress' },
+    { title: 'Cierre semanal', status: 'todo', priority: 'low' },
+  ],
+  client: [
+    { title: 'Kickoff con el cliente', status: 'done', priority: 'high' },
+    { title: 'Relevamiento de requisitos', status: 'in-progress', priority: 'high' },
+    { title: 'Propuesta y presupuesto', status: 'todo', priority: 'medium' },
+    { title: 'Entrega de avance', status: 'todo' },
+    { title: 'Feedback y ajustes', status: 'todo' },
+    { title: 'Entrega final', status: 'todo', priority: 'high' },
+  ],
+};
+
+const BOARD_TEMPLATE_IDS = ['sprint', 'personal', 'client'] as const;
+type BoardTemplateId = (typeof BOARD_TEMPLATE_IDS)[number];
+
+// Crear un tablero desde una plantilla (con tareas de ejemplo)
+export async function createBoardFromTemplate(
+  userId: string,
+  data: CreateBoardInput,
+  templateId: string
+): Promise<ApiResponse<IBoard>> {
+  try {
+    const template = BOARD_TEMPLATES[templateId];
+    if (!template) {
+      return { success: false, error: 'Plantilla no válida' };
+    }
+
+    const result = await createBoard(userId, data);
+    if (!result.success || !result.data) {
+      return result;
+    }
+
+    const newBoard = result.data;
+    await Task.insertMany(
+      template.map((t, i) => ({
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        boardId: newBoard._id,
+        createdBy: userId,
+        assignedTo: [],
+        tags: [],
+        order: i,
+      }))
+    );
+
+    return { success: true, data: newBoard };
+  } catch (error) {
+    console.error('Error al crear tablero desde plantilla:', error);
+    return { success: false, error: 'Error al crear el tablero' };
+  }
+}
+
+// Duplicar un tablero con sus tareas (sin comentarios ni adjuntos)
+export async function duplicateBoard(boardId: string): Promise<ApiResponse<IBoard>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const board = await findAccessibleBoard(boardId, user);
+    if (!board) {
+      return { success: false, error: 'Tablero no encontrado o sin permisos' };
+    }
+
+    await connectDB();
+
+    const lastBoard = await Board.findOne({
+      owner: user.id,
+      projectId: board.projectId || null,
+    }).sort({ order: -1 });
+
+    const newBoard = await Board.create({
+      name: `${board.name} (copia)`.slice(0, 100),
+      description: board.description || '',
+      owner: user.id,
+      members: board.members || [],
+      tags: board.tags || [],
+      projectId: board.projectId || null,
+      color: board.color,
+      columns: board.columns || [],
+      order: lastBoard ? lastBoard.order + 1 : 0,
+    });
+
+    const tasks = await Task.find({ boardId, deletedAt: null }).lean();
+    if (tasks.length > 0) {
+      await Task.insertMany(
+        tasks.map((t) => ({
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          boardId: newBoard._id,
+          createdBy: user.id,
+          assignedTo: t.assignedTo,
+          tags: t.tags,
+          order: t.order,
+          dueDate: t.dueDate,
+          deliveryDate: t.deliveryDate,
+          checklist: t.checklist,
+          priority: t.priority,
+        }))
+      );
+    }
+
+    revalidatePath('/dashboard');
+    if (newBoard.projectId) {
+      revalidatePath(`/parent-project/${newBoard.projectId}`);
+    }
+
+    return { success: true, data: JSON.parse(JSON.stringify(newBoard)) };
+  } catch (error) {
+    console.error('Error al duplicar tablero:', error);
+    return { success: false, error: 'Error al duplicar el tablero' };
+  }
+}
+
+// Guardar las columnas personalizadas de un tablero (add/rename/reorder/color en un paso).
+// Las tareas de columnas eliminadas se mueven a la primera columna restante.
+export async function saveBoardColumns(
+  boardId: string,
+  columns: IBoardColumn[]
+): Promise<ApiResponse<IBoard>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const board = await findEditableBoard(boardId, user);
+    if (!board) {
+      return { success: false, error: 'Tablero no encontrado o sin permisos de edición' };
+    }
+
+    // Validaciones
+    if (!Array.isArray(columns) || columns.length === 0 || columns.length > 8) {
+      return { success: false, error: 'El tablero debe tener entre 1 y 8 columnas' };
+    }
+    const ids = new Set<string>();
+    for (const col of columns) {
+      const id = col.id?.trim();
+      const title = col.title?.trim();
+      if (!id || id.length > 40 || !/^[a-z0-9-]+$/.test(id)) {
+        return { success: false, error: 'Cada columna necesita un ID válido (a-z, 0-9, guiones)' };
+      }
+      if (!title || title.length > 30) {
+        return { success: false, error: 'Cada columna necesita un nombre (máx. 30 caracteres)' };
+      }
+      if (!/^#[0-9A-Fa-f]{6}$/.test(col.color)) {
+        return { success: false, error: 'Color de columna inválido' };
+      }
+      if (ids.has(id)) {
+        return { success: false, error: 'IDs de columna duplicados' };
+      }
+      ids.add(id);
+    }
+
+    const previousIds = new Set((board.columns ?? []).map((c) => c.id));
+    const newIds = new Set(columns.map((c) => c.id));
+    // IDs eliminados = columnas previas que ya no están (las default no se "eliminan"
+    // salvo que el tablero ya tuviera columnas personalizadas)
+    const effectivePrevious = previousIds.size > 0 ? previousIds : new Set(DEFAULT_COLUMNS.map((c) => c.id));
+    const removedIds = [...effectivePrevious].filter((id) => !newIds.has(id));
+
+    board.columns = columns.map((c) => ({
+      id: c.id.trim(),
+      title: c.title.trim(),
+      color: c.color,
+    }));
+    await board.save();
+
+    // Reasignar tareas de columnas eliminadas a la primera columna
+    if (removedIds.length > 0) {
+      await Task.updateMany(
+        { boardId, status: { $in: removedIds }, deletedAt: null },
+        { $set: { status: columns[0].id.trim() } }
+      );
+    }
+
+    revalidatePath(`/board/${boardId}`);
+
+    return { success: true, data: JSON.parse(JSON.stringify(board)) };
+  } catch (error) {
+    console.error('Error al guardar columnas:', error);
+    return { success: false, error: 'Error al guardar las columnas' };
   }
 }

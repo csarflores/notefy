@@ -1,4 +1,4 @@
-# Notefy
+# Harold
 
 Un administrador de proyectos multiproyecto diseñado con la filosofía de simplicidad y estética de **Apple**, utilizando el stack moderno de **Next.js 15** y **MongoDB**.
 
@@ -68,7 +68,7 @@ El objetivo principal es proporcionar una herramienta de gestión de tareas **gr
 ## 📁 Estructura del Proyecto
 
 ```
-notefy/
+harold/
 ├── app/                    # Next.js 15 App Router
 │   ├── dashboard/          # Dashboard principal
 │   ├── board/              # Vistas de tableros Kanban
@@ -83,6 +83,7 @@ notefy/
 ├── models/                 # Esquemas Mongoose
 ├── lib/                    # Utilidades y configuración
 ├── types/                  # Tipos TypeScript
+├── public/                 # Assets estáticos (imágenes, favicon, etc.)
 └── .ai/                    # Documentación para IA
 ```
 
@@ -109,7 +110,7 @@ Este repositorio incluye archivos de contexto para maximizar la eficiencia de lo
 ```bash
 # Clonar el repositorio
 git clone <repo-url>
-cd notefy
+cd harold
 
 # Instalar dependencias
 npm install
@@ -125,9 +126,21 @@ npm run dev
 ### Variables de Entorno
 
 ```env
-MONGODB_URI=mongodb://localhost:27017/notefy
+MONGODB_URI=mongodb://localhost:27017/harold
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=your-secret-key
+
+# Opcional — OAuth con Google (si no se definen, el botón no aparece)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Opcional — emails transaccionales (verificación, invitaciones, reset, recordatorios)
+# Sin estas vars, la verificación de email se omite y las cuentas quedan verificadas.
+EMAIL_USER=
+EMAIL_APP_PASSWORD=
+
+# Opcional — protege la ruta /api/cron/reminders (Vercel Cron)
+CRON_SECRET=
 ```
 
 ## 📊 Modelos de Datos

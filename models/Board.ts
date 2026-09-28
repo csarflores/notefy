@@ -1,5 +1,14 @@
 import mongoose, { Schema, Model } from 'mongoose';
-import { IBoard, ITag } from '@/types';
+import { IBoard, IBoardColumn, ITag } from '@/types';
+
+const ColumnSchema = new Schema<IBoardColumn>(
+  {
+    id: { type: String, required: true, maxlength: 40 },
+    title: { type: String, required: true, trim: true, maxlength: 30 },
+    color: { type: String, required: true, match: /^#[0-9A-Fa-f]{6}$/ },
+  },
+  { _id: false }
+);
 
 const TagSchema = new Schema(
   {
@@ -46,6 +55,11 @@ const BoardSchema = new Schema<IBoard>(
         message: 'Todos los miembros deben tener emails válidos',
       },
     },
+    memberRoles: {
+      type: Map,
+      of: { type: String, enum: ['viewer', 'commenter', 'editor'] },
+      default: {},
+    },
     tags: {
       type: [TagSchema],
       default: [],
@@ -74,6 +88,15 @@ const BoardSchema = new Schema<IBoard>(
     order: {
       type: Number,
       default: 0,
+    },
+    columns: {
+      // Si está vacío se usan las 3 columnas por defecto (todo/in-progress/done)
+      type: [ColumnSchema],
+      default: [],
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

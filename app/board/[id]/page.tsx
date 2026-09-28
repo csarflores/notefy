@@ -6,6 +6,7 @@ import TabSyncer from '@/components/tabs/TabSyncer';
 import { getBoardById } from '@/actions/board-actions';
 import { getBoardTasks } from '@/actions/task-actions';
 import { getBoardUsers } from '@/actions/board-actions';
+import { getProjectById } from '@/actions/project-actions';
 import BoardClient from './BoardClient';
 
 interface BoardPageProps {
@@ -27,6 +28,15 @@ async function BoardContent({ boardId }: { boardId: string }) {
   const tasks = tasksResult.success && tasksResult.data ? tasksResult.data : [];
   const users = usersResult.success && usersResult.data ? usersResult.data : [];
 
+  // Nombre del proyecto padre para el breadcrumb
+  let projectName: string | undefined;
+  if (board.projectId) {
+    const projectResult = await getProjectById(board.projectId.toString());
+    if (projectResult.success && projectResult.data) {
+      projectName = projectResult.data.name;
+    }
+  }
+
   return (
     <>
       <TabSyncer
@@ -41,6 +51,7 @@ async function BoardContent({ boardId }: { boardId: string }) {
         tasks={tasks}
         boardUsers={users}
         boardTags={board.tags || []}
+        projectName={projectName}
       />
     </>
   );

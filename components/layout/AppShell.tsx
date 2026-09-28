@@ -12,16 +12,18 @@ import { CommandPaletteProvider } from './CommandPaletteContext';
 import CreateProjectGroupModal from '@/components/dashboard/CreateProjectGroupModal';
 import CreateBoardModal from '@/components/dashboard/CreateBoardModal';
 import CreateNoteModal from '@/components/notes/CreateNoteModal';
+import ShortcutsModal from '@/components/ui/ShortcutsModal';
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
   const { data: session } = useSession();
 
-  const isAuthPage = pathname.startsWith('/auth');
+  const isAuthPage = pathname.startsWith('/auth') || pathname.startsWith('/invite') || pathname.startsWith('/share');
 
   const [projectModal, setProjectModal] = useState(false);
   const [boardModal, setBoardModal] = useState(false);
   const [noteModal, setNoteModal] = useState(false);
+  const [shortcutsModal, setShortcutsModal] = useState(false);
 
   // Global keyboard shortcuts (skip when typing in inputs)
   useEffect(() => {
@@ -33,6 +35,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       if (e.key === 'n') { e.preventDefault(); setNoteModal(true); }
       if (e.key === 'b') { e.preventDefault(); setBoardModal(true); }
       if (e.key === 'p') { e.preventDefault(); setProjectModal(true); }
+      if (e.key === '?') { e.preventDefault(); setShortcutsModal(true); }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
@@ -92,6 +95,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
         userId={userId}
         ownerEmail={userEmail}
         ownerName={userName}
+      />
+      <ShortcutsModal
+        isOpen={shortcutsModal}
+        onClose={() => setShortcutsModal(false)}
       />
     </SidebarProvider>
     </CommandPaletteProvider>

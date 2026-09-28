@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Filter, X } from 'lucide-react';
-import { IUser, ITag } from '@/types';
+import { Filter, X, Flag } from 'lucide-react';
+import { IUser, ITag, IBoardColumn } from '@/types';
 import Badge from '@/components/ui/Badge';
+import { PRIORITY_META } from './PriorityPicker';
+import { getBoardColumns } from '@/lib/board-columns';
 
-export type FilterType = 'all' | 'my-tasks' | 'todo' | 'in-progress' | 'done' | string;
+export type FilterType = 'all' | 'my-tasks' | string;
 
 interface TaskFiltersProps {
   currentFilter: FilterType;
@@ -13,23 +15,24 @@ interface TaskFiltersProps {
   currentUserId?: string;
   projectUsers?: IUser[];
   projectTags?: ITag[];
+  columns?: IBoardColumn[];
 }
 
-export default function TaskFilters({ 
-  currentFilter, 
+export default function TaskFilters({
+  currentFilter,
   onFilterChange,
   currentUserId,
   projectUsers = [],
-  projectTags = []
+  projectTags = [],
+  columns: columnsProp
 }: TaskFiltersProps) {
   const [showFilters, setShowFilters] = useState(false);
+  const columns = getBoardColumns(columnsProp);
 
   const filters = [
-    { id: 'all', label: 'Todas', icon: null },
+    { id: 'all', label: 'Todas', icon: null, requiresUser: false },
     { id: 'my-tasks', label: 'Mis tareas', icon: null, requiresUser: true },
-    { id: 'todo', label: 'Pendientes', icon: null },
-    { id: 'in-progress', label: 'En proceso', icon: null },
-    { id: 'done', label: 'Finalizadas', icon: null },
+    ...columns.map((c) => ({ id: `col:${c.id}`, label: c.title, icon: null, requiresUser: false })),
   ];
 
   const handleFilterClick = (filterId: string) => {
@@ -37,7 +40,15 @@ export default function TaskFilters({
     setShowFilters(false);
   };
 
-  const activeFilter = filters.find(f => f.id === currentFilter) || 
+  const priorityFilters = [
+    { id: 'priority:high', label: 'Alta' },
+    { id: 'priority:medium', label: 'Media' },
+    { id: 'priority:low', label: 'Baja' },
+    { id: 'priority:none', label: 'Sin prioridad' },
+  ];
+
+  const activeFilter = filters.find(f => f.id === currentFilter) ||
+                       priorityFilters.find(p => p.id === currentFilter) ||
                        projectUsers.find(u => u._id.toString() === currentFilter) ||
                        projectTags.find(t => t.text === currentFilter);
   
@@ -103,6 +114,32 @@ export default function TaskFilters({
                   </button>
                 );
               })}
+            </div>
+
+            {/* Filtros por prioridad */}
+            <div className="h-px bg-[#e0e0e0] my-2" />
+            <div className="px-2">
+              <p className="text-[10px] font-semibold text-[#7a7a7a] px-2 mb-1 tracking-[-0.08px]">
+                POR PRIORIDAD
+              </p>
+              {priorityFilters.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => handleFilterClick(p.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-[12px] transition-all tracking-[-0.12px] flex items-center gap-2 ${
+                    currentFilter === p.id
+                      ? 'bg-[#0066cc]/10 text-[#0066cc] font-medium'
+                      : 'text-[#1d1d1f] hover:bg-[#f5f5f7]'
+                  }`}
+                >
+                  <Flag
+                    size={11}
+                    color={p.id === 'priority:none' ? '#c7c7cc' : PRIORITY_META[p.id.split(':')[1] as 'low' | 'medium' | 'high'].color}
+                    fill={p.id === 'priority:none' ? '#c7c7cc' : PRIORITY_META[p.id.split(':')[1] as 'low' | 'medium' | 'high'].color}
+                  />
+                  {p.label}
+                </button>
+              ))}
             </div>
 
             {/* Filtros por etiqueta */}

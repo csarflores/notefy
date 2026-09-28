@@ -108,6 +108,22 @@ const TagSchema = new Schema(
   { _id: false }
 );
 
+const ChecklistItemSchema = new Schema(
+  {
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [200, 'El item no puede exceder 200 caracteres'],
+    },
+    done: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { timestamps: false }
+);
+
 const TaskSchema = new Schema<ITask>(
   {
     title: {
@@ -122,11 +138,10 @@ const TaskSchema = new Schema<ITask>(
       maxlength: [50000, 'La descripción no puede exceder 50000 caracteres (incluye etiquetas HTML del editor de texto rico)'],
     },
     status: {
+      // ID de la columna del tablero ('todo' | 'in-progress' | 'done' por defecto,
+      // o IDs personalizados de board.columns)
       type: String,
-      enum: {
-        values: ['todo', 'in-progress', 'done'],
-        message: 'El estado debe ser: todo, in-progress o done',
-      },
+      maxlength: [40, 'El estado no puede exceder 40 caracteres'],
       default: 'todo',
     },
     boardId: {
@@ -176,11 +191,37 @@ const TaskSchema = new Schema<ITask>(
       type: [CommentSchema],
       default: [],
     },
+    checklist: {
+      type: [ChecklistItemSchema],
+      default: [],
+      validate: {
+        validator: function (items: unknown[]) {
+          return items.length <= 50;
+        },
+        message: 'No puedes agregar más de 50 items al checklist',
+      },
+    },
+    priority: {
+      type: String,
+      enum: {
+        values: ['low', 'medium', 'high'],
+        message: 'La prioridad debe ser: low, medium o high',
+      },
+      default: null,
+    },
     dueDate: {
       type: Date,
       default: null,
     },
     deliveryDate: {
+      type: Date,
+      default: null,
+    },
+    reminderSentFor: {
+      type: Date,
+      default: null,
+    },
+    deletedAt: {
       type: Date,
       default: null,
     },

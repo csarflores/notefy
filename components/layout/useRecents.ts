@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 
 export interface RecentItem {
   id: string;
-  type: 'project' | 'board' | 'note';
+  type: 'project' | 'board' | 'note' | 'calendar';
   title: string;
   url: string;
 }
 
-const STORAGE_KEY = 'notefy-recents-v1';
+const STORAGE_KEY = 'harold-recents-v1';
 const MAX = 5;
 
 export function useRecents() {

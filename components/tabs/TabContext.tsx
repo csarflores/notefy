@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 
 export interface Tab {
   id: string;
-  type: 'dashboard' | 'project' | 'board' | 'calendar' | 'settings';
+  type: 'dashboard' | 'project' | 'board' | 'calendar' | 'settings' | 'note';
   resourceId?: string;
   title: string;
   url: string;
@@ -27,8 +27,8 @@ interface TabContextValue {
 
 const TabContext = createContext<TabContextValue | null>(null);
 
-const TABS_STORAGE_KEY = 'notefy-tabs-v1';
-const ACTIVE_TAB_KEY = 'notefy-active-tab-v1';
+const TABS_STORAGE_KEY = 'harold-tabs-v1';
+const ACTIVE_TAB_KEY = 'harold-active-tab-v1';
 
 export function TabProvider({ children }: { children: ReactNode }) {
   const [tabs, setTabs] = useState<Tab[]>([DASHBOARD_TAB]);
