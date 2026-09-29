@@ -4,6 +4,7 @@ import "./globals.css";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import Providers from "./providers";
+import { assetPath } from "@/lib/assets";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,14 +19,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Harold - Gestión de Proyectos",
   description: "Administrador de proyectos multiproyecto con estilo Apple",
-  manifest: "/manifest.json",
+  manifest: assetPath("manifest.json"),
   icons: {
     icon: [
-      { url: "/harold-favicon-16.png", sizes: "16x16", type: "image/png" },
-      { url: "/harold-favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/harold-favicon-48.png", sizes: "48x48", type: "image/png" },
+      { url: assetPath("harold-favicon.ico"), sizes: "any" },
+      { url: assetPath("harold-favicon-16.png"), sizes: "16x16", type: "image/png" },
+      { url: assetPath("harold-favicon-32.png"), sizes: "32x32", type: "image/png" },
+      { url: assetPath("harold-favicon-48.png"), sizes: "48x48", type: "image/png" },
     ],
-    apple: [{ url: "/harold-apple-touch-icon-180.png", sizes: "180x180" }],
+    apple: [{ url: assetPath("harold-apple-touch-icon-180.png"), sizes: "180x180" }],
   },
 };
 

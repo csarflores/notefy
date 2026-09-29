@@ -1,9 +1,16 @@
 import type { NextConfig } from "next";
+import { ASSET_PACK } from "./lib/assets";
 
 const cloudfrontUrl = process.env.NEXT_PUBLIC_CLOUDFRONT_URL || "";
 const cloudfrontHost = cloudfrontUrl ? new URL(cloudfrontUrl).hostname : null;
 
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return [
+      // /favicon.ico apunta al pack de assets activo
+      { source: "/favicon.ico", destination: `/${ASSET_PACK}/harold-favicon.ico` },
+    ];
+  },
   images: {
     remotePatterns: [
       // Host actual de la distribución
