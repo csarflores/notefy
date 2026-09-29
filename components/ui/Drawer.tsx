@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, ReactNode, useEffect } from 'react';
+import { Fragment, ReactNode, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { overlayStack } from './overlay-stack';
@@ -13,6 +13,12 @@ interface DrawerProps {
 }
 
 export default function Drawer({ isOpen, onClose, children, className }: DrawerProps) {
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!isOpen) return;
     const id = Symbol('drawer');
@@ -21,7 +27,7 @@ export default function Drawer({ isOpen, onClose, children, className }: DrawerP
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && overlayStack[overlayStack.length - 1] === id) {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
       }
     };
     document.addEventListener('keydown', onKeyDown);
@@ -32,7 +38,7 @@ export default function Drawer({ isOpen, onClose, children, className }: DrawerP
       document.removeEventListener('keydown', onKeyDown);
       if (overlayStack.length === 0) document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   return (
     <AnimatePresence>

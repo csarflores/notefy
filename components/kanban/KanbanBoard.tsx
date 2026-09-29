@@ -6,7 +6,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { ITask, IBoardColumn } from '@/types';
 import { getBoardColumns } from '@/lib/board-columns';
 import TaskCard from './TaskCard';
-import AddTaskComposer from './AddTaskComposer';
+import TaskDetailPanel from './TaskDetailPanel';
 import { moveTask, deleteMultipleTasks, bulkUpdateTaskStatus } from '@/actions/task-actions';
 import { restoreItem } from '@/actions/trash-actions';
 import { useRouter } from 'next/navigation';
@@ -45,7 +45,7 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEd
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [composerFor, setComposerFor] = useState<string | null>(null);
+  const [newTaskStatus, setNewTaskStatus] = useState<string | null>(null);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
 
@@ -302,7 +302,7 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEd
                 </div>
                 {canEdit && (
                   <button
-                    onClick={() => setComposerFor(column.id)}
+                    onClick={() => setNewTaskStatus(column.id)}
                     className="p-1 hover:bg-[#f5f5f7] rounded-full transition-colors"
                     title="Crear nueva tarea"
                   >
@@ -366,21 +366,32 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEd
               )}
             </Droppable>
 
-            {/* Composer inline de nueva tarea */}
+            {/* Botón de nueva tarea al pie de la columna */}
             {canEdit && (
               <div className="mt-2 px-2 sm:px-3">
-                <AddTaskComposer
-                  boardId={boardId}
-                  status={column.id}
-                  open={composerFor === column.id}
-                  onOpenChange={(open) => setComposerFor(open ? column.id : null)}
-                />
+                <button
+                  type="button"
+                  onClick={() => setNewTaskStatus(column.id)}
+                  className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-lg text-[12px] text-[#8e8e93] hover:bg-[#f5f5f7] hover:text-[#3a3a3c] transition-all"
+                >
+                  <Plus size={14} />
+                  Nueva tarea
+                </button>
               </div>
             )}
           </div>
         ))}
       </div>
     </DragDropContext>
+
+    {/* Panel de crear tarea */}
+    <TaskDetailPanel
+      isOpen={newTaskStatus !== null}
+      onClose={() => setNewTaskStatus(null)}
+      boardId={boardId}
+      defaultStatus={newTaskStatus ?? undefined}
+      columns={columns}
+    />
     </>
   );
 }

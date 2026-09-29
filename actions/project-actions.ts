@@ -10,6 +10,7 @@ import {
   isSelf,
   findAccessibleProject,
   findOwnedProject,
+  removeMemberRole,
 } from '@/lib/auth-helpers';
 
 // Obtener todos los proyectos del usuario
@@ -200,7 +201,7 @@ export async function removeProjectMember(
     }
 
     project.members = project.members.filter((member) => member !== email);
-    project.memberRoles?.delete(email);
+    removeMemberRole(project, email);
     await project.save();
 
     // También eliminar el miembro de todos los tableros del proyecto
@@ -212,8 +213,8 @@ export async function removeProjectMember(
     // Limpiar el rol en los tableros del proyecto
     const boards = await Board.find({ projectId, memberRoles: { $exists: true } });
     for (const board of boards) {
-      if (board.memberRoles?.has(email)) {
-        board.memberRoles.delete(email);
+      if (board.memberRoles?.[email]) {
+        removeMemberRole(board, email);
         await board.save();
       }
     }

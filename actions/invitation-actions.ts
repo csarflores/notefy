@@ -7,7 +7,7 @@ import Invitation from '@/models/Invitation';
 import Project from '@/models/Project';
 import Board from '@/models/Board';
 import Note from '@/models/Note';
-import { getAuthUser, findOwnedProject, findOwnedBoard, isOwner, isMemberOrOwner, AuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, findOwnedProject, findOwnedBoard, isOwner, isMemberOrOwner, setMemberRole as assignMemberRole, removeMemberRole, AuthUser } from '@/lib/auth-helpers';
 import { sendInvitationEmail } from '@/lib/mail';
 import { notifyUserByEmail } from '@/lib/notify';
 import { isValidObjectId } from '@/lib/utils';
@@ -213,26 +213,26 @@ export async function acceptInvitation(token: string): Promise<ApiResponse<{ lin
       const project = await Project.findById(resourceId);
       if (!project || project.deletedAt) return { success: false, error: 'El proyecto ya no existe' };
       if (!project.members.includes(invitation.email)) project.members.push(invitation.email);
-      project.memberRoles?.set(invitation.email, role);
+      assignMemberRole(project, invitation.email, role);
       await project.save();
       // Propagar a los tableros del proyecto
       const boards = await Board.find({ projectId: resourceId, deletedAt: null });
       for (const board of boards) {
         if (!board.members.includes(invitation.email)) board.members.push(invitation.email);
-        board.memberRoles?.set(invitation.email, role);
+        assignMemberRole(board, invitation.email, role);
         await board.save();
       }
     } else if (resourceType === 'board') {
       const board = await Board.findById(resourceId);
       if (!board || board.deletedAt) return { success: false, error: 'El tablero ya no existe' };
       if (!board.members.includes(invitation.email)) board.members.push(invitation.email);
-      board.memberRoles?.set(invitation.email, role);
+      assignMemberRole(board, invitation.email, role);
       await board.save();
     } else {
       const note = await Note.findById(resourceId);
       if (!note || note.deletedAt) return { success: false, error: 'La nota ya no existe' };
       if (!note.members.includes(invitation.email)) note.members.push(invitation.email);
-      note.memberRoles?.set(invitation.email, role);
+      assignMemberRole(note, invitation.email, role);
       note.visibility = 'shared';
       await note.save();
     }
@@ -380,14 +380,14 @@ export async function setMemberRole(
 
     const doc = resource as unknown as {
       members: string[];
-      memberRoles?: Map<string, MemberRole>;
+      memberRoles?: Record<string, MemberRole>;
       save(): Promise<unknown>;
     };
     const normalizedEmail = email.toLowerCase();
     if (!doc.members.includes(normalizedEmail)) {
       return { success: false, error: 'El usuario no es miembro' };
     }
-    doc.memberRoles?.set(normalizedEmail, role);
+    assignMemberRole(doc, normalizedEmail, role);
     await doc.save();
 
     // Propagar cambio a tableros si es un proyecto
@@ -395,7 +395,7 @@ export async function setMemberRole(
       const boards = await Board.find({ projectId: resourceId, deletedAt: null });
       for (const board of boards) {
         if (board.members.includes(normalizedEmail)) {
-          board.memberRoles?.set(normalizedEmail, role);
+          assignMemberRole(board, normalizedEmail, role);
           await board.save();
         }
       }
@@ -416,7 +416,7 @@ export async function setMemberRole(
 interface AccessibleDoc {
   owner: { toString(): string };
   members: string[];
-  memberRoles?: Map<string, MemberRole>;
+  memberRoles?: Record<string, MemberRole>;
 }
 
 // Devuelve el recurso si el usuario es owner o miembro (para ver la lista de miembros)
@@ -485,7 +485,7 @@ export async function getResourceMembers(
         email,
         name: u?.name ?? null,
         image: (u?.image as string | null | undefined) ?? null,
-        role: resource.memberRoles?.get(email) ?? 'editor',
+        role: resource.memberRoles?.[email] ?? 'editor',
         registered: !!u,
       };
     });
@@ -522,7 +522,7 @@ async function removeMemberFromResource(
   if (!doc) return;
 
   doc.members = doc.members.filter((m: string) => m !== email);
-  doc.memberRoles?.delete(email);
+  removeMemberRole(doc, email);
   if (resourceType === 'note' && doc.members.length === 0) {
     (doc as INote).visibility = 'private';
   }
@@ -531,9 +531,9 @@ async function removeMemberFromResource(
   if (resourceType === 'project') {
     const boards = await Board.find({ projectId: resourceId, deletedAt: null });
     for (const board of boards) {
-      if (board.members.includes(email) || board.memberRoles?.has(email)) {
+      if (board.members.includes(email) || board.memberRoles?.[email]) {
         board.members = board.members.filter((m) => m !== email);
-        board.memberRoles?.delete(email);
+        removeMemberRole(board, email);
         await board.save();
       }
     }

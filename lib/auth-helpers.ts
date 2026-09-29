@@ -34,7 +34,25 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 interface OwnableDoc {
   owner: { toString(): string };
   members?: string[];
-  memberRoles?: Map<string, MemberRole>;
+  memberRoles?: Record<string, MemberRole>;
+}
+
+// memberRoles se persiste como objeto plano { email: rol } porque los Maps de
+// Mongoose no admiten claves con '.' (todos los emails la contienen).
+// Se reasigna el objeto completo para que Mongoose marque el campo como modificado.
+interface WithMemberRoles {
+  memberRoles?: Record<string, MemberRole>;
+}
+
+export function setMemberRole(doc: WithMemberRoles, email: string, role: MemberRole): void {
+  doc.memberRoles = { ...(doc.memberRoles ?? {}), [email]: role };
+}
+
+export function removeMemberRole(doc: WithMemberRoles, email: string): void {
+  if (!doc.memberRoles?.[email]) return;
+  const roles = { ...doc.memberRoles };
+  delete roles[email];
+  doc.memberRoles = roles;
 }
 
 export type ResourceRole = 'owner' | 'editor' | 'commenter' | 'viewer' | null;
@@ -52,7 +70,7 @@ export function isMemberOrOwner(doc: OwnableDoc, user: AuthUser): boolean {
 export function getResourceRole(doc: OwnableDoc, user: AuthUser): ResourceRole {
   if (isOwner(doc, user)) return 'owner';
   if (!(doc.members ?? []).includes(user.email)) return null;
-  return doc.memberRoles?.get(user.email) ?? 'editor';
+  return doc.memberRoles?.[user.email] ?? 'editor';
 }
 
 // Puede modificar el recurso (owner o miembro con rol editor)

@@ -20,6 +20,11 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
 export default function Modal({ isOpen, onClose, title, children, className, headerContent }: ModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<Element | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,7 +42,7 @@ export default function Modal({ isOpen, onClose, title, children, className, hea
       if (overlayStack[overlayStack.length - 1] !== id) return;
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       // Focus trap: mantener Tab dentro del modal
@@ -68,7 +73,7 @@ export default function Modal({ isOpen, onClose, title, children, className, hea
         previouslyFocused.current.focus();
       }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
   return (
     <AnimatePresence>
       {isOpen && (

@@ -29,10 +29,20 @@ const ProjectSchema = new Schema<IProject>(
         message: 'Todos los miembros deben tener emails válidos',
       },
     },
+    // Objeto plano { email: rol }; los Maps de Mongoose no admiten '.' en las claves
     memberRoles: {
-      type: Map,
-      of: { type: String, enum: ['viewer', 'commenter', 'editor'] },
+      type: Schema.Types.Mixed,
       default: {},
+      validate: {
+        validator: function (roles: Record<string, string>) {
+          return (
+            !roles ||
+            (typeof roles === 'object' &&
+              Object.values(roles).every((r) => ['viewer', 'commenter', 'editor'].includes(r)))
+          );
+        },
+        message: 'Los roles de miembro deben ser válidos',
+      },
     },
     color: {
       type: String,

@@ -38,6 +38,42 @@ import type { UploadScope } from '@/actions/upload-actions';
 
 const lowlight = createLowlight(common);
 
+function ToolbarButton({
+  onClick,
+  active,
+  title,
+  disabled,
+  children,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  title?: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={cn(
+        'p-1.5 rounded transition-colors',
+        active
+          ? 'bg-[#e8f0fb] text-[#0066cc]'
+          : 'text-[#636366] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]',
+        disabled && 'opacity-30 cursor-not-allowed pointer-events-none'
+      )}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Divider() {
+  return <span className="w-px h-4 bg-[#e5e5ea] mx-1 shrink-0" />;
+}
+
 interface NoteEditorProps {
   content: string;
   onChange: (content: string) => void;
@@ -210,38 +246,6 @@ export default function NoteEditor({
 
   if (!editor) return null;
 
-  const ToolbarButton = ({
-    onClick,
-    active,
-    title,
-    children,
-  }: {
-    onClick: () => void;
-    active?: boolean;
-    title?: string;
-    children: React.ReactNode;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={cn(
-        'p-1.5 rounded transition-colors',
-        active
-          ? 'bg-[#e8f0fb] text-[#0066cc]'
-          : 'text-[#636366] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]',
-        !editable && 'opacity-30 cursor-not-allowed pointer-events-none'
-      )}
-      disabled={!editable}
-    >
-      {children}
-    </button>
-  );
-
-  const Divider = () => (
-    <span className="w-px h-4 bg-[#e5e5ea] mx-1 shrink-0" />
-  );
-
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -275,6 +279,7 @@ export default function NoteEditor({
       {editable && (
         <div className="flex items-center flex-wrap gap-0.5 px-3 py-2 border-b border-[#f0f0f0]">
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive('bold')}
             title="Negrita"
@@ -283,6 +288,7 @@ export default function NoteEditor({
           </ToolbarButton>
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleItalic().run()}
             active={editor.isActive('italic')}
             title="Cursiva"
@@ -291,6 +297,7 @@ export default function NoteEditor({
           </ToolbarButton>
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             active={editor.isActive('underline')}
             title="Subrayado"
@@ -301,6 +308,7 @@ export default function NoteEditor({
           <Divider />
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
             active={editor.isActive('heading', { level: 1 })}
             title="Encabezado 1"
@@ -309,6 +317,7 @@ export default function NoteEditor({
           </ToolbarButton>
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
             active={editor.isActive('heading', { level: 2 })}
             title="Encabezado 2"
@@ -317,6 +326,7 @@ export default function NoteEditor({
           </ToolbarButton>
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
             active={editor.isActive('heading', { level: 3 })}
             title="Encabezado 3"
@@ -327,6 +337,7 @@ export default function NoteEditor({
           <Divider />
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
             active={editor.isActive('bulletList')}
             title="Lista"
@@ -335,6 +346,7 @@ export default function NoteEditor({
           </ToolbarButton>
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
             active={editor.isActive('orderedList')}
             title="Lista numerada"
@@ -345,6 +357,7 @@ export default function NoteEditor({
           <Divider />
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}
             active={editor.isActive('codeBlock')}
             title="Bloque de código"
@@ -353,6 +366,7 @@ export default function NoteEditor({
           </ToolbarButton>
 
           <ToolbarButton
+            disabled={!editable}
             onClick={openLinkInput}
             active={editor.isActive('link') || linkInputOpen}
             title="Enlace"
@@ -362,6 +376,7 @@ export default function NoteEditor({
 
           {canInsertImages && (
             <ToolbarButton
+            disabled={!editable}
               onClick={() => imageInputRef.current?.click()}
               title="Imagen"
             >
@@ -397,6 +412,7 @@ export default function NoteEditor({
           <Divider />
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().undo().run()}
             title="Deshacer"
           >
@@ -404,6 +420,7 @@ export default function NoteEditor({
           </ToolbarButton>
 
           <ToolbarButton
+            disabled={!editable}
             onClick={() => editor.chain().focus().redo().run()}
             title="Rehacer"
           >

@@ -16,6 +16,7 @@ import {
   findEditableBoard,
   findEditableProject,
   findOwnedBoard,
+  removeMemberRole,
 } from '@/lib/auth-helpers';
 
 // Obtener todos los tableros del usuario
@@ -349,7 +350,7 @@ export async function removeBoardMember(
     }
 
     board.members = board.members.filter((member) => member !== email);
-    board.memberRoles?.delete(email);
+    removeMemberRole(board, email);
     await board.save();
 
     revalidatePath(`/board/${boardId}`);

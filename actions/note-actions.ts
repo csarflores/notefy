@@ -17,6 +17,7 @@ import {
   isOwner,
   findAccessibleProject,
   findEditableProject,
+  removeMemberRole,
 } from '@/lib/auth-helpers';
 
 // Obtener todas las notas del usuario (incluyendo notas compartidas con él)
@@ -216,7 +217,7 @@ export async function updateNote(
 
     // Verificar permisos: owner o member con rol editor (si es shared)
     const isNoteOwner = isOwner(note, user);
-    const memberRole = note.memberRoles?.get(user.email) ?? 'editor';
+    const memberRole = note.memberRoles?.[user.email] ?? 'editor';
     const isMember =
       note.visibility === 'shared' &&
       note.members.includes(user.email) &&
@@ -398,7 +399,7 @@ export async function removeNoteMember(
     }
 
     note.members = note.members.filter((member) => member !== email);
-    note.memberRoles?.delete(email);
+    removeMemberRole(note, email);
 
     // Si no hay miembros, volver a private
     if (note.members.length === 0) {
@@ -618,7 +619,7 @@ async function findEditableNote(noteId: string, user: AuthUser) {
   const note = await findReadableNote(noteId, user);
   if (!note) return null;
   if (isOwner(note, user)) return note;
-  const role = note.memberRoles?.get(user.email) ?? 'editor';
+  const role = note.memberRoles?.[user.email] ?? 'editor';
   if (note.members.includes(user.email) && role === 'editor') return note;
   return null;
 }

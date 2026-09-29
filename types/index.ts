@@ -31,7 +31,7 @@ export interface IProject extends Document {
   description?: string;
   owner: Types.ObjectId;
   members: string[];
-  memberRoles?: Types.Map<MemberRole>;
+  memberRoles?: Record<string, MemberRole>;
   color: string;
   icon?: string;
   deletedAt?: Date | null;
@@ -46,7 +46,7 @@ export interface IBoard extends Document {
   description?: string;
   owner: Types.ObjectId;
   members: string[];
-  memberRoles?: Types.Map<MemberRole>;
+  memberRoles?: Record<string, MemberRole>;
   tags: ITag[];
   projectId?: Types.ObjectId | null;
   color: string;
@@ -161,7 +161,7 @@ export interface INote extends Document {
   visibility: 'private' | 'shared';
   owner: Types.ObjectId;
   members: string[];
-  memberRoles?: Types.Map<MemberRole>;
+  memberRoles?: Record<string, MemberRole>;
   publicToken?: string | null;
   linkedNotes?: Types.ObjectId[];
   projectId?: Types.ObjectId | null;
