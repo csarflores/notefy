@@ -209,6 +209,14 @@ const TaskSchema = new Schema<ITask>(
       },
       default: null,
     },
+    recurrence: {
+      type: String,
+      enum: {
+        values: ['daily', 'weekly', 'monthly'],
+        message: 'La recurrencia debe ser: daily, weekly o monthly',
+      },
+      default: null,
+    },
     dueDate: {
       type: Date,
       default: null,

@@ -44,6 +44,11 @@ const ProjectSchema = new Schema<IProject>(
         message: 'El color debe ser un código hexadecimal válido (ej: #0066cc)',
       },
     },
+    icon: {
+      type: String,
+      maxlength: [8, 'El icono no puede exceder 8 caracteres'],
+      default: null,
+    },
     deletedAt: {
       type: Date,
       default: null,

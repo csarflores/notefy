@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button';
 import { createProject } from '@/actions/project-actions';
 import { Palette } from 'lucide-react';
 import { PROJECT_COLORS } from '@/constants/project-colors';
+import IconPicker from '@/components/ui/IconPicker';
 
 interface CreateProjectGroupModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export default function CreateProjectGroupModal({ isOpen, onClose, userId }: Cre
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#0066cc');
+  const [icon, setIcon] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -39,6 +41,7 @@ export default function CreateProjectGroupModal({ isOpen, onClose, userId }: Cre
         name: name.trim(),
         description: description.trim(),
         color: color,
+        icon: icon || undefined,
       });
 
       if (result.success) {
@@ -61,6 +64,7 @@ export default function CreateProjectGroupModal({ isOpen, onClose, userId }: Cre
       setName('');
       setDescription('');
       setColor('#0066cc');
+      setIcon('');
       setError('');
       setShowColorPicker(false);
       onClose();
@@ -111,6 +115,7 @@ export default function CreateProjectGroupModal({ isOpen, onClose, userId }: Cre
           <div className="space-y-3">
             {/* Color seleccionado actual */}
             <div className="flex items-center gap-3">
+              <IconPicker value={icon} onChange={setIcon} />
               <button
                 type="button"
                 onClick={() => setShowColorPicker(!showColorPicker)}

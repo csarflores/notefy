@@ -6,7 +6,7 @@ import KanbanBoard from '@/components/kanban/KanbanBoard';
 import TaskListView from '@/components/kanban/TaskListView';
 import TaskFilters, { FilterType } from '@/components/kanban/TaskFilters';
 import { ITask, IUser, ITag, IBoardColumn } from '@/types';
-import { Inbox, KanbanSquare, List } from 'lucide-react';
+import { Inbox, KanbanSquare, List, Rows2 } from 'lucide-react';
 
 interface BoardWithFiltersProps {
   tasks: ITask[];
@@ -31,13 +31,27 @@ export default function BoardWithFilters({
 }: BoardWithFiltersProps) {
   const { data: session } = useSession();
   const [currentFilter, setCurrentFilter] = useState<FilterType>('all');
-  const [view, setView] = useState<'kanban' | 'list'>(() =>
-    typeof window !== 'undefined' && localStorage.getItem('board-view') === 'list' ? 'list' : 'kanban'
+  const [view, setView] = useState<'kanban' | 'list'>(() => {
+    if (typeof window === 'undefined') return 'kanban';
+    const stored = localStorage.getItem('board-view');
+    if (stored === 'list' || stored === 'kanban') return stored;
+    // En pantallas pequeñas, la vista lista es más usable por defecto
+    return window.matchMedia('(max-width: 767px)').matches ? 'list' : 'kanban';
+  });
+  const [compact, setCompact] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem('board-compact') === '1'
   );
 
   const handleViewChange = (v: 'kanban' | 'list') => {
     setView(v);
     try { localStorage.setItem('board-view', v); } catch {}
+  };
+
+  const toggleCompact = () => {
+    setCompact((c) => {
+      try { localStorage.setItem('board-compact', c ? '0' : '1'); } catch {}
+      return !c;
+    });
   };
 
   // Si no hay tags en el tablero, extraer todas las tags únicas de las tareas
@@ -152,8 +166,20 @@ export default function BoardWithFilters({
               )}
             </div>
 
-            {/* Toggle kanban/lista */}
+            {/* Toggle kanban/lista + compacto */}
             <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[#f0f0f2]">
+              {view === 'kanban' && (
+                <button
+                  type="button"
+                  onClick={toggleCompact}
+                  title={compact ? 'Densidad normal' : 'Modo compacto'}
+                  className={`p-1.5 rounded-md transition-all ${
+                    compact ? 'bg-white shadow-sm text-[#0066cc]' : 'text-[#8e8e93] hover:text-[#3a3a3c]'
+                  }`}
+                >
+                  <Rows2 size={15} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => handleViewChange('kanban')}
@@ -192,9 +218,9 @@ export default function BoardWithFilters({
               </p>
             </div>
           ) : view === 'list' ? (
-            <TaskListView tasks={filteredTasks} columns={columns} canEdit={canEdit} canComment={canComment} />
+            <TaskListView tasks={filteredTasks} columns={columns} canEdit={canEdit} canComment={canComment} boardUsers={boardUsers} boardTags={allTags} />
           ) : (
-            <KanbanBoard initialTasks={filteredTasks} boardId={boardId} boardOwnerId={boardOwnerId} canEdit={canEdit} canComment={canComment} columns={columns} />
+            <KanbanBoard initialTasks={filteredTasks} boardId={boardId} boardOwnerId={boardOwnerId} canEdit={canEdit} canComment={canComment} columns={columns} compact={compact} />
           )}
         </>
       )}

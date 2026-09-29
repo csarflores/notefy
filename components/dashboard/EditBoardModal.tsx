@@ -10,6 +10,7 @@ import { IBoard, IProject } from '@/types';
 import { useSession } from 'next-auth/react';
 import { Save, X, Palette } from 'lucide-react';
 import { PROJECT_COLORS } from '@/constants/project-colors';
+import IconPicker from '@/components/ui/IconPicker';
 
 interface EditBoardModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#6b7280');
+  const [icon, setIcon] = useState('');
   const [projectId, setProjectId] = useState<string | null>(null);
   const [availableProjects, setAvailableProjects] = useState<IProject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +38,7 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
       setName(board.name);
       setDescription(board.description || '');
       setColor(board.color || '#6b7280');
+      setIcon(board.icon || '');
       setProjectId(board.projectId?.toString() || null);
     }
   }, [board]);
@@ -76,6 +79,7 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
         name: name.trim(),
         description: description.trim(),
         color: color,
+        icon: icon,
         projectId: projectId,
       });
 
@@ -143,11 +147,12 @@ export default function EditBoardModal({ isOpen, onClose, board }: EditBoardModa
         {/* Selector de Color */}
         <div>
           <label className="block text-sm font-medium text-[#1d1d1f] mb-2">
-            Color del Tablero
+            Color e icono
           </label>
           <div className="space-y-3">
             {/* Color seleccionado actual */}
             <div className="flex items-center gap-3">
+              <IconPicker value={icon} onChange={setIcon} />
               <button
                 type="button"
                 onClick={() => setShowColorPicker(!showColorPicker)}

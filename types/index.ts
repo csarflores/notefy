@@ -10,6 +10,7 @@ export interface IUser extends Document {
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   favorites: string[];
+  notificationPrefs?: INotificationPrefs;
   emailVerified?: Date | null;
   verifyEmailToken?: string;
   verifyEmailExpires?: Date;
@@ -32,6 +33,7 @@ export interface IProject extends Document {
   members: string[];
   memberRoles?: Types.Map<MemberRole>;
   color: string;
+  icon?: string;
   deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -48,6 +50,8 @@ export interface IBoard extends Document {
   tags: ITag[];
   projectId?: Types.ObjectId | null;
   color: string;
+  icon?: string;
+  publicToken?: string | null;
   order: number;
   columns?: IBoardColumn[];
   deletedAt?: Date | null;
@@ -110,6 +114,9 @@ export interface IChecklistItem {
 
 export type TaskPriority = 'low' | 'medium' | 'high';
 
+// Frecuencia de repetición de una tarea recurrente
+export type TaskRecurrence = 'daily' | 'weekly' | 'monthly';
+
 // Tipos para Task
 export interface ITask extends Document {
   _id: Types.ObjectId;
@@ -126,6 +133,7 @@ export interface ITask extends Document {
   comments: IComment[];
   checklist?: IChecklistItem[];
   priority?: TaskPriority;
+  recurrence?: TaskRecurrence | null;
   order: number;
   dueDate?: Date | null;
   deliveryDate?: Date | null;
@@ -133,6 +141,16 @@ export interface ITask extends Document {
   deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Snapshot del historial de versiones de una nota
+export interface INoteVersion {
+  _id: Types.ObjectId;
+  title: string;
+  content: string;
+  savedBy?: Types.ObjectId;
+  savedByName?: string;
+  createdAt: Date;
 }
 
 // Tipos para Note
@@ -148,6 +166,8 @@ export interface INote extends Document {
   linkedNotes?: Types.ObjectId[];
   projectId?: Types.ObjectId | null;
   color: string;
+  versions?: INoteVersion[];
+  comments?: IComment[];
   deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -180,6 +200,32 @@ export interface IInvitation extends Document {
   createdAt: Date;
 }
 
+// Preferencias de notificación del usuario
+export interface INotificationPrefs {
+  assigned: boolean;
+  comment: boolean;
+  reply: boolean;
+  mention: boolean;
+  invite: boolean;
+  member: boolean;
+  reminder: boolean;
+  emailEnabled: boolean;
+}
+
+// Entrada del historial de actividad de un tablero
+export interface IActivity extends Document {
+  _id: Types.ObjectId;
+  boardId: Types.ObjectId;
+  taskId?: Types.ObjectId | null;
+  taskTitle?: string;
+  actorId: Types.ObjectId;
+  actorName: string;
+  actorImage?: string;
+  action: 'created' | 'updated' | 'moved' | 'completed' | 'deleted' | 'commented' | 'assigned';
+  detail?: string;
+  createdAt: Date;
+}
+
 // Tipos para respuestas de API
 export type ApiResponse<T> = {
   success: boolean;
@@ -192,6 +238,7 @@ export type CreateProjectInput = {
   name: string;
   description?: string;
   color?: string;
+  icon?: string;
 };
 
 export type UpdateProjectInput = Partial<CreateProjectInput> & {
@@ -204,6 +251,7 @@ export type CreateBoardInput = {
   description?: string;
   projectId?: string | null;
   color?: string;
+  icon?: string;
 };
 
 export type UpdateBoardInput = Partial<CreateBoardInput> & {
@@ -223,6 +271,7 @@ export type CreateTaskInput = {
   checklist?: { _id?: string; text: string; done: boolean }[];
   dueDate?: string | null;
   deliveryDate?: string | null;
+  recurrence?: TaskRecurrence | null;
 };
 
 export type UpdateTaskInput = Partial<CreateTaskInput> & {

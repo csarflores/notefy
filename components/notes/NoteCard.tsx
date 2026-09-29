@@ -10,6 +10,8 @@ import SidebarContextMenu from '@/components/layout/SidebarContextMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import FavoriteButton from '@/components/ui/FavoriteButton';
 import { deleteNote } from '@/actions/note-actions';
+import { restoreItem } from '@/actions/trash-actions';
+import { useNotification } from '@/components/ui/NotificationContext';
 
 interface NoteCardProps {
   note: INote;
@@ -23,6 +25,7 @@ interface NoteCardProps {
 export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onDelete, isFavorite = false }: NoteCardProps) {
   const router = useRouter();
   const { openTab } = useTabContext();
+  const { showNotification } = useNotification();
   const [preview, setPreview] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -34,6 +37,17 @@ export default function NoteCard({ note, onOpenNote, isOwner = true, userId, onD
     try {
       await deleteNote(note._id.toString(), userId);
       onDelete?.();
+      const noteId = note._id.toString();
+      showNotification('Nota eliminada', 'success', {
+        action: {
+          label: 'Deshacer',
+          onClick: async () => {
+            await restoreItem('note', noteId);
+            onDelete?.();
+            router.refresh();
+          },
+        },
+      });
       router.refresh();
     } finally {
       setIsDeleting(false);

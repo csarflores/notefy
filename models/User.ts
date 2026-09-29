@@ -37,6 +37,20 @@ const UserSchema = new Schema<IUser>(
       type: [String],
       default: [],
     },
+    // Preferencias de notificación (qué tipos recibir in-app y si enviar email)
+    notificationPrefs: {
+      type: {
+        assigned: { type: Boolean, default: true },
+        comment: { type: Boolean, default: true },
+        reply: { type: Boolean, default: true },
+        mention: { type: Boolean, default: true },
+        invite: { type: Boolean, default: true },
+        member: { type: Boolean, default: true },
+        reminder: { type: Boolean, default: true },
+        emailEnabled: { type: Boolean, default: false },
+      },
+      default: () => ({}),
+    },
     emailVerified: {
       type: Date,
       default: null,

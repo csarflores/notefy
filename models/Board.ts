@@ -85,6 +85,16 @@ const BoardSchema = new Schema<IBoard>(
         message: 'El color debe ser un código hexadecimal válido (ej: #6b7280)',
       },
     },
+    icon: {
+      type: String,
+      maxlength: [8, 'El icono no puede exceder 8 caracteres'],
+      default: null,
+    },
+    publicToken: {
+      type: String,
+      default: null,
+      index: true,
+    },
     order: {
       type: Number,
       default: 0,

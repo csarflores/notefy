@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import ProjectCard from '@/components/dashboard/ProjectCard';
 import BoardCard from '@/components/dashboard/BoardCard';
 import NoteCard from '@/components/notes/NoteCard';
+import FadeIn from '@/components/ui/FadeIn';
 import ViewEditNoteModal from '@/components/notes/ViewEditNoteModal';
 import { IProject, IBoard, INote } from '@/types';
 import { updateBoard, reorderBoards } from '@/actions/board-actions';
@@ -138,15 +139,16 @@ export default function DashboardWithDragDrop({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
             {[...projects]
               .sort((a, b) => Number(favSet.has(`project:${b.item._id.toString()}`)) - Number(favSet.has(`project:${a.item._id.toString()}`)))
-              .map(({ item, childCount }) => (
+              .map(({ item, childCount }, i) => (
+              <FadeIn key={item._id.toString()} delay={Math.min(i * 0.04, 0.3)}>
               <ProjectCard
-                key={item._id.toString()}
                 project={item}
                 boardCount={childCount}
                 onBoardDrop={handleBoardDrop}
                 isFavorite={favSet.has(`project:${item._id.toString()}`)}
                 progress={progress[item._id.toString()]}
               />
+              </FadeIn>
             ))}
           </div>
         </div>
@@ -165,8 +167,8 @@ export default function DashboardWithDragDrop({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
             {unassignedBoards.map(({ item }, index) => (
+              <FadeIn key={item._id.toString()} delay={Math.min(index * 0.04, 0.3)}>
               <BoardCard 
-                key={item._id.toString()} 
                 board={item} 
                 index={index}
                 onDragStart={handleBoardDragStart}
@@ -175,6 +177,7 @@ export default function DashboardWithDragDrop({
                 dragOverCompatible={!!draggedBoard && (draggedBoard.projectId || null) === (item.projectId?.toString() || null)}
                 isFavorite={favSet.has(`board:${item._id.toString()}`)}
               />
+              </FadeIn>
             ))}
           </div>
         </div>
@@ -187,9 +190,9 @@ export default function DashboardWithDragDrop({
             Notas
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2">
-            {notes.map(({ note, ownerEmail, ownerName }) => (
+            {notes.map(({ note, ownerEmail, ownerName }, i) => (
+              <FadeIn key={note._id.toString()} delay={Math.min(i * 0.04, 0.3)}>
               <NoteCard
-                key={note._id.toString()}
                 note={note}
                 onOpenNote={() => handleNoteClick(note, ownerEmail, ownerName)}
                 isOwner={note.owner.toString() === userId}
@@ -197,6 +200,7 @@ export default function DashboardWithDragDrop({
                 onDelete={() => router.refresh()}
                 isFavorite={favSet.has(`note:${note._id.toString()}`)}
               />
+              </FadeIn>
             ))}
           </div>
         </div>

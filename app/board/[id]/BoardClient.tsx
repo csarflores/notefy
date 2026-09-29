@@ -2,18 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2, LayoutGrid, Calendar, Tags, Folder, Eye, Columns3, Share2, MessageSquare } from 'lucide-react';
+import { Plus, Users, ArrowLeft, MoreVertical, Edit2, Trash2, LayoutGrid, Calendar, Tags, Folder, Eye, Columns3, Share2, MessageSquare, History, FileDown, Upload } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import TaskDetailPanel from '@/components/kanban/TaskDetailPanel';
 import EditBoardModal from '@/components/dashboard/EditBoardModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import TagManagerModal from '@/components/kanban/TagManagerModal';
 import ColumnsModal from '@/components/kanban/ColumnsModal';
+import BoardActivityPanel from '@/components/kanban/BoardActivityPanel';
 import ShareDialog from '@/components/share/ShareDialog';
+import ImportBoardModal from '@/components/kanban/ImportBoardModal';
+import BoardSyncer from '@/components/kanban/BoardSyncer';
 import BoardWithFilters from './BoardWithFilters';
 import TaskCalendar from '@/components/calendar/TaskCalendar';
 import { deleteBoard } from '@/actions/board-actions';
+import { exportBoardCSV } from '@/actions/export-actions';
 import { updateTask } from '@/actions/task-actions';
+import { useNotification } from '@/components/ui/NotificationContext';
 import { IBoard, ITask, IUser, ITag, MemberRole } from '@/types';
 
 interface BoardClientProps {
@@ -48,13 +53,38 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
   const [showTagManager, setShowTagManager] = useState(false);
   const [showColumnsModal, setShowColumnsModal] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const { showNotification } = useNotification();
+
+  const handleExportCSV = async () => {
+    setShowBoardMenu(false);
+    const result = await exportBoardCSV(board._id.toString());
+    if (result.success && result.data) {
+      const blob = new Blob([result.data.csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.data.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotification('Tablero exportado a CSV', 'success');
+    } else {
+      showNotification(result.error || 'Error al exportar', 'error');
+    }
+  };
 
   // Deep-link: abrir una tarea puntual via ?task=<id> (ej. desde la búsqueda)
+  // o el modal de creación via ?newTask=1 (desde el command palette)
   useEffect(() => {
     const taskId = searchParams.get('task');
-    if (!taskId) return;
-    const task = tasks.find((t) => t._id.toString() === taskId);
-    if (task) setEditingTask(task);
+    if (taskId) {
+      const task = tasks.find((t) => t._id.toString() === taskId);
+      if (task) setEditingTask(task);
+    }
+    if (searchParams.get('newTask') && canEdit) {
+      setIsTaskModalOpen(true);
+    }
   // Solo al montar con las tareas iniciales
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -82,6 +112,9 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
 
   return (
     <>
+      {/* Polling ligero para sincronizar cambios de otros usuarios */}
+      <BoardSyncer boardId={board._id.toString()} />
+
       {/* Header del tablero */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-20 w-full">
         <div className="w-full px-2 sm:px-5 h-11 flex items-center gap-1.5">
@@ -106,10 +139,13 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
                   className="hidden sm:flex items-center gap-1 text-[12px] text-[#a0a0a8] hover:text-[#0066cc] transition-colors shrink-0"
                 >
                   <Folder size={11} />
-                  <span className="max-w-[140px] truncate">{projectName}</span>
+                  <span className="max-w-35 truncate">{projectName}</span>
                 </button>
                 <span className="hidden sm:inline text-[#d1d1d6] text-[12px] shrink-0">/</span>
               </>
+            )}
+            {board.icon && (
+              <span className="text-[15px] leading-none shrink-0">{board.icon}</span>
             )}
             <span className="text-[14px] font-semibold text-[#1d1d1f] tracking-tight truncate leading-none">
               {board.name}
@@ -169,6 +205,16 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
           </button>
           )}
 
+          {/* Actividad */}
+          <button
+            onClick={() => setShowActivity(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-[#7a7a7a] hover:bg-[#f5f5f7] hover:text-[#1d1d1f] transition-colors shrink-0"
+            title="Actividad del tablero"
+          >
+            <History size={13} />
+            <span className="hidden sm:inline">Actividad</span>
+          </button>
+
           {/* Compartir */}
           <button
             onClick={() => setShowShareDialog(true)}
@@ -221,8 +267,22 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
                       <Columns3 size={13} className="text-[#7a7a7a]" />
                       Personalizar columnas
                     </button>
+                    <button
+                      onClick={() => { setShowBoardMenu(false); setShowImportModal(true); }}
+                      className="w-full px-3 py-2 text-left text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2.5 rounded-lg transition-colors"
+                    >
+                      <Upload size={13} className="text-[#7a7a7a]" />
+                      Importar CSV / Trello
+                    </button>
                     </>
                     )}
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full px-3 py-2 text-left text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] flex items-center gap-2.5 rounded-lg transition-colors"
+                    >
+                      <FileDown size={13} className="text-[#7a7a7a]" />
+                      Exportar a CSV
+                    </button>
                   </div>
                   {isBoardOwner && (
                     <>
@@ -289,6 +349,13 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
         />
       )}
 
+      {/* Panel de actividad */}
+      <BoardActivityPanel
+        isOpen={showActivity}
+        onClose={() => setShowActivity(false)}
+        boardId={board._id.toString()}
+      />
+
       {/* Diálogo de compartir */}
       <ShareDialog
         isOpen={showShareDialog}
@@ -297,6 +364,7 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
         resourceId={board._id.toString()}
         resourceName={board.name}
         ownerId={board.owner.toString()}
+        boardPublicToken={board.publicToken}
       />
 
       {/* Modal de editar tablero */}
@@ -321,6 +389,13 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
         onClose={() => setShowColumnsModal(false)}
         boardId={board._id.toString()}
         initialColumns={board.columns}
+      />
+
+      {/* Modal de importación */}
+      <ImportBoardModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        boardId={board._id.toString()}
       />
 
       {/* Diálogo de confirmación de eliminación */}

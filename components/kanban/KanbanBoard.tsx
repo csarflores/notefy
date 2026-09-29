@@ -8,6 +8,7 @@ import { getBoardColumns } from '@/lib/board-columns';
 import TaskCard from './TaskCard';
 import AddTaskComposer from './AddTaskComposer';
 import { moveTask, deleteMultipleTasks, bulkUpdateTaskStatus } from '@/actions/task-actions';
+import { restoreItem } from '@/actions/trash-actions';
 import { useRouter } from 'next/navigation';
 import { Trash2, X, Plus, ArrowRight } from 'lucide-react';
 import Button from '@/components/ui/Button';
@@ -21,11 +22,12 @@ interface KanbanBoardProps {
   canEdit?: boolean;
   canComment?: boolean;
   columns?: IBoardColumn[];
+  compact?: boolean;
 }
 
 type TasksByStatus = Record<string, ITask[]>;
 
-export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEdit = true, canComment = true, columns: columnsProp }: KanbanBoardProps) {
+export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEdit = true, canComment = true, columns: columnsProp, compact = false }: KanbanBoardProps) {
   const columns = useMemo(() => getBoardColumns(columnsProp), [columnsProp]);
   const router = useRouter();
   const { data: session } = useSession();
@@ -135,10 +137,19 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEd
     try {
       const result = await deleteMultipleTasks(Array.from(selectedTasks));
       if (result.success) {
+        const deletedIds = Array.from(selectedTasks);
         setShowDeleteDialog(false);
         setSelectedTasks(new Set());
         setSelectionMode(false);
-        showNotification(`${selectedTasks.size} ${selectedTasks.size === 1 ? 'tarea eliminada' : 'tareas eliminadas'}`, 'success');
+        showNotification(`${deletedIds.length} ${deletedIds.length === 1 ? 'tarea eliminada' : 'tareas eliminadas'}`, 'success', {
+          action: {
+            label: 'Deshacer',
+            onClick: async () => {
+              for (const id of deletedIds) await restoreItem('task', id);
+              router.refresh();
+            },
+          },
+        });
         router.refresh();
       } else {
         showNotification(result.error || 'Error al eliminar las tareas', 'error');
@@ -307,7 +318,7 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEd
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`flex-1 space-y-2 sm:space-y-3 p-2 sm:p-3 rounded-lg transition-colors min-h-[120px] sm:min-h-[200px] ${
+                  className={`flex-1 ${compact ? 'space-y-1.5' : 'space-y-2 sm:space-y-3'} ${compact ? 'p-1.5' : 'p-2 sm:p-3'} rounded-lg transition-colors min-h-[120px] sm:min-h-[200px] ${
                     snapshot.isDraggingOver
                       ? 'bg-[#0066cc]/5 ring-1 ring-[#0066cc]/20'
                       : 'bg-transparent'
@@ -343,6 +354,7 @@ export default function KanbanBoard({ initialTasks, boardId, boardOwnerId, canEd
                               onToggleSelection={handleToggleSelection}
                               canEdit={canEdit}
                               canComment={canComment}
+                              compact={compact}
                             />
                           </div>
                         )}

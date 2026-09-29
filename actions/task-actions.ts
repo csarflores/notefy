@@ -9,7 +9,8 @@ import { CreateTaskInput, UpdateTaskInput, ApiResponse, ITask, IComment, IReply,
 import { isValidObjectId } from '@/lib/utils';
 import { notifyUser } from '@/lib/notify';
 import { escapeRegExp } from '@/lib/utils';
-import { getBoardColumns } from '@/lib/board-columns';
+import { getBoardColumns, getDoneColumnId } from '@/lib/board-columns';
+import { logActivity } from '@/lib/activity';
 import User from '@/models/User';
 import {
   getAuthUser,
@@ -46,6 +47,55 @@ export async function getBoardTasks(boardId: string): Promise<ApiResponse<ITask[
   } catch (error) {
     console.error('Error al obtener tareas:', error);
     return { success: false, error: 'Error al obtener las tareas' };
+  }
+}
+
+// Avanza una fecha según la frecuencia de recurrencia
+function nextOccurrence(date: Date, recurrence: 'daily' | 'weekly' | 'monthly'): Date {
+  const next = new Date(date);
+  if (recurrence === 'daily') next.setDate(next.getDate() + 1);
+  else if (recurrence === 'weekly') next.setDate(next.getDate() + 7);
+  else next.setMonth(next.getMonth() + 1);
+  return next;
+}
+
+// Crea la siguiente ocurrencia de una tarea recurrente al completarla.
+// El original queda archivado en la columna "done" y la copia nace en la primera columna.
+async function spawnNextOccurrence(task: ITask, columns: { id: string }[]): Promise<void> {
+  try {
+    if (!task.recurrence) return;
+    const firstColumnId = columns[0]?.id || 'todo';
+
+    const lastTask = await Task.findOne({
+      boardId: task.boardId,
+      status: firstColumnId,
+      deletedAt: null,
+    })
+      .sort({ order: -1 })
+      .select('order');
+
+    const clone: Record<string, unknown> = {
+      title: task.title,
+      description: task.description,
+      boardId: task.boardId,
+      createdBy: task.createdBy,
+      status: firstColumnId,
+      assignedTo: task.assignedTo,
+      imageUrl: task.imageUrl,
+      tags: task.tags,
+      priority: task.priority,
+      recurrence: task.recurrence,
+      checklist: (task.checklist ?? []).map((c) => ({ text: c.text, done: false })),
+      order: lastTask ? lastTask.order + 1 : 0,
+      dueDate: task.dueDate ? nextOccurrence(new Date(task.dueDate), task.recurrence) : null,
+      deliveryDate: task.deliveryDate
+        ? nextOccurrence(new Date(task.deliveryDate), task.recurrence)
+        : null,
+    };
+
+    await Task.create(clone);
+  } catch (error) {
+    console.error('Error al crear la siguiente ocurrencia:', error);
   }
 }
 
@@ -99,6 +149,7 @@ export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITa
       checklist: (data.checklist || []).map((c) => ({ text: c.text.slice(0, 200), done: !!c.done })),
       dueDate: data.dueDate ? new Date(data.dueDate) : null,
       deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : null,
+      recurrence: data.recurrence || null,
     });
 
     const populatedTask = await Task.findById(newTask._id)
@@ -114,6 +165,8 @@ export async function createTask(data: CreateTaskInput): Promise<ApiResponse<ITa
         );
       }
     }
+
+    await logActivity(data.boardId, user, 'created', newTask);
 
     revalidatePath(`/board/${data.boardId}`);
 
@@ -141,25 +194,57 @@ export async function updateTask(
     }
 
     const previousAssignees = new Set(task.assignedTo.map((a) => a.toString()));
+    const oldStatus = task.status;
+    const changed: string[] = [];
 
     // Actualizar campos
-    if (data.title !== undefined) task.title = data.title.trim();
-    if (data.description !== undefined) task.description = data.description.trim();
+    if (data.title !== undefined && data.title.trim() !== task.title) {
+      task.title = data.title.trim();
+      changed.push('título');
+    }
+    if (data.description !== undefined && data.description.trim() !== (task.description || '')) {
+      task.description = data.description.trim();
+      changed.push('descripción');
+    }
+    let boardColumns: { id: string; title: string; color: string }[] | null = null;
     if (data.status !== undefined) {
       // Validar que sea una columna del tablero
       const board = await Board.findById(task.boardId).select('columns').lean();
-      if (!getBoardColumns(board?.columns).some((c) => c.id === data.status)) {
+      boardColumns = getBoardColumns(board?.columns);
+      if (!boardColumns.some((c) => c.id === data.status)) {
         return { success: false, error: 'La columna indicada no existe en el tablero' };
       }
-      task.status = data.status;
+      if (data.status !== oldStatus) {
+        task.status = data.status;
+        changed.push(`estado → ${boardColumns.find((c) => c.id === data.status)?.title ?? data.status}`);
+      }
     }
-    if (data.assignedTo !== undefined) task.assignedTo = data.assignedTo as unknown as Types.ObjectId[];
-    if (data.tags !== undefined) task.tags = data.tags;
+    if (data.assignedTo !== undefined) {
+      task.assignedTo = data.assignedTo as unknown as Types.ObjectId[];
+      changed.push('asignados');
+    }
+    if (data.tags !== undefined) {
+      task.tags = data.tags;
+      changed.push('etiquetas');
+    }
     if (data.order !== undefined) task.order = data.order;
     if (data.imageUrl !== undefined) task.imageUrl = data.imageUrl;
-    if (data.dueDate !== undefined) task.dueDate = data.dueDate ? new Date(data.dueDate) : null;
-    if (data.deliveryDate !== undefined) task.deliveryDate = data.deliveryDate ? new Date(data.deliveryDate) : null;
-    if (data.priority !== undefined) task.priority = data.priority ?? undefined;
+    if (data.dueDate !== undefined) {
+      task.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+      changed.push('fecha límite');
+    }
+    if (data.deliveryDate !== undefined) {
+      task.deliveryDate = data.deliveryDate ? new Date(data.deliveryDate) : null;
+      changed.push('fecha de entrega');
+    }
+    if (data.priority !== undefined) {
+      task.priority = data.priority ?? undefined;
+      changed.push('prioridad');
+    }
+    if (data.recurrence !== undefined) {
+      task.recurrence = data.recurrence ?? null;
+      changed.push('recurrencia');
+    }
     if (data.checklist !== undefined) {
       task.set('checklist', data.checklist.map((c) => ({
         ...(c._id && isValidObjectId(c._id) ? { _id: new Types.ObjectId(c._id) } : {}),
@@ -184,6 +269,29 @@ export async function updateTask(
           );
         }
       }
+      if (task.assignedTo.some((a) => !previousAssignees.has(a.toString()))) {
+        await logActivity(task.boardId.toString(), user, 'assigned', task);
+      }
+    }
+
+    // Registrar actividad y, si se completó una tarea recurrente, crear la siguiente ocurrencia
+    const doneColumnId = boardColumns
+      ? getDoneColumnId(boardColumns)
+      : null;
+    const movedToDone = data.status !== undefined && data.status !== oldStatus && data.status === doneColumnId;
+    if (movedToDone) {
+      await logActivity(task.boardId.toString(), user, 'completed', task);
+      if (task.recurrence) {
+        const cols = boardColumns ?? getBoardColumns(
+          (await Board.findById(task.boardId).select('columns').lean())?.columns
+        );
+        await spawnNextOccurrence(task, cols);
+      }
+    } else if (data.status !== undefined && data.status !== oldStatus) {
+      await logActivity(task.boardId.toString(), user, 'moved', task,
+        boardColumns?.find((c) => c.id === data.status)?.title);
+    } else if (changed.length > 0) {
+      await logActivity(task.boardId.toString(), user, 'updated', task, changed.join(', '));
     }
 
     revalidatePath(`/board/${task.boardId}`);
@@ -266,6 +374,18 @@ export async function moveTask(
       .populate('assignedTo', 'name email image')
       .lean();
 
+    // Actividad + recurrencia si llegó a la columna "done"
+    const doneId = getDoneColumnId(validColumns);
+    if (oldStatus !== newStatus) {
+      if (newStatus === doneId) {
+        await logActivity(task.boardId.toString(), user, 'completed', task);
+        if (task.recurrence) await spawnNextOccurrence(task, validColumns);
+      } else {
+        await logActivity(task.boardId.toString(), user, 'moved', task,
+          validColumns.find((c) => c.id === newStatus)?.title);
+      }
+    }
+
     revalidatePath(`/board/${task.boardId}`);
 
     return { success: true, data: JSON.parse(JSON.stringify(updatedTask)) };
@@ -307,6 +427,7 @@ export async function bulkUpdateTaskStatus(
 
     // Verificar acceso a todos los tableros involucrados y que la columna exista
     const boardIds = [...new Set(tasks.map((t) => t.boardId.toString()))];
+    const boardsChecked = new Map<string, NonNullable<Awaited<ReturnType<typeof findEditableBoard>>>>();
     for (const boardId of boardIds) {
       const board = await findEditableBoard(boardId, user);
       if (!board) {
@@ -315,6 +436,7 @@ export async function bulkUpdateTaskStatus(
       if (!getBoardColumns(board.columns).some((c) => c.id === status)) {
         return { success: false, error: 'La columna destino no existe en algún tablero' };
       }
+      boardsChecked.set(boardId, board);
     }
 
     // Agrupar por tablero y agregar al final de la columna destino
@@ -330,6 +452,21 @@ export async function bulkUpdateTaskStatus(
         await task.save();
       }
       revalidatePath(`/board/${boardId}`);
+    }
+
+    // Actividad + recurrencia si las tareas llegaron a la columna "done"
+    for (const boardId of boardIds) {
+      const board = boardsChecked.get(boardId);
+      const cols = board ? getBoardColumns(board.columns) : null;
+      const doneId = cols ? getDoneColumnId(cols) : null;
+      for (const task of tasks.filter((t) => t.boardId.toString() === boardId)) {
+        if (status === doneId) {
+          await logActivity(boardId, user, 'completed', task);
+          if (task.recurrence && cols) await spawnNextOccurrence(task, cols);
+        } else {
+          await logActivity(boardId, user, 'moved', task);
+        }
+      }
     }
 
     return { success: true, data: null };
@@ -400,6 +537,8 @@ export async function deleteTask(taskId: string): Promise<ApiResponse<null>> {
       { boardId, status, deletedAt: null, order: { $gt: order } },
       { $inc: { order: -1 } }
     );
+
+    await logActivity(boardId.toString(), user, 'deleted', task);
 
     revalidatePath(`/board/${boardId}`);
 
@@ -481,6 +620,10 @@ export async function deleteMultipleTasks(taskIds: string[]): Promise<ApiRespons
       }
 
       revalidatePath(`/board/${boardId}`);
+    }
+
+    for (const t of tasks) {
+      await logActivity(t.boardId.toString(), user, 'deleted', t);
     }
 
     return { success: true, data: null };
@@ -583,6 +726,7 @@ export async function addComment(taskId: string, content: string): Promise<ApiRe
       );
     }
     await notifyMentions(trimmed, task, user, recipients);
+    await logActivity(task.boardId.toString(), user, 'commented', task);
 
     revalidatePath(`/board/${task.boardId}`);
 
@@ -784,5 +928,111 @@ export async function getMyTaskPermissions(
   } catch (error) {
     console.error('Error al obtener permisos de la tarea:', error);
     return { success: false, error: 'Error al obtener los permisos' };
+  }
+}
+
+// Helper: valida IDs y devuelve las tareas junto con los tableros verificados como editables
+async function getEditableTasksForBulk(taskIds: string[], user: AuthUser) {
+  if (!taskIds || taskIds.length === 0 || taskIds.length > 200) {
+    return { error: 'Selecciona entre 1 y 200 tareas' } as const;
+  }
+  const invalidIds = taskIds.filter((id) => !isValidObjectId(id));
+  if (invalidIds.length > 0) {
+    return { error: 'Algunos IDs de tarea son inválidos' } as const;
+  }
+
+  await connectDB();
+  const tasks = await Task.find({ _id: { $in: taskIds }, deletedAt: null });
+  if (tasks.length === 0) {
+    return { error: 'No se encontraron tareas' } as const;
+  }
+
+  const boardIds = [...new Set(tasks.map((t) => t.boardId.toString()))];
+  for (const boardId of boardIds) {
+    const board = await findEditableBoard(boardId, user);
+    if (!board) {
+      return { error: 'Sin permisos de edición en algún tablero' } as const;
+    }
+  }
+
+  return { tasks, boardIds } as const;
+}
+
+// Asignar responsables a múltiples tareas (reemplaza la lista de asignados)
+export async function bulkAssignTasks(
+  taskIds: string[],
+  assigneeIds: string[]
+): Promise<ApiResponse<null>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const invalidAssignees = assigneeIds.filter((id) => !isValidObjectId(id));
+    if (invalidAssignees.length > 0 || assigneeIds.length > 20) {
+      return { success: false, error: 'Asignados inválidos' };
+    }
+
+    const checked = await getEditableTasksForBulk(taskIds, user);
+    if ('error' in checked) {
+      return { success: false, error: checked.error };
+    }
+
+    for (const task of checked.tasks) {
+      task.assignedTo = assigneeIds as unknown as Types.ObjectId[];
+      await task.save();
+      await logActivity(task.boardId.toString(), user, 'assigned', task);
+    }
+
+    for (const boardId of checked.boardIds) {
+      revalidatePath(`/board/${boardId}`);
+    }
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al asignar tareas:', error);
+    return { success: false, error: 'Error al asignar las tareas' };
+  }
+}
+
+// Agregar una etiqueta a múltiples tareas (sin duplicar por texto+color)
+export async function bulkAddTagToTasks(
+  taskIds: string[],
+  tag: { text: string; color: string }
+): Promise<ApiResponse<null>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const text = tag?.text?.trim();
+    if (!text || text.length > 30 || !/^#[0-9A-Fa-f]{6}$/.test(tag?.color ?? '')) {
+      return { success: false, error: 'Etiqueta inválida' };
+    }
+
+    const checked = await getEditableTasksForBulk(taskIds, user);
+    if ('error' in checked) {
+      return { success: false, error: checked.error };
+    }
+
+    for (const task of checked.tasks) {
+      const exists = task.tags.some((t) => t.text.toLowerCase() === text.toLowerCase());
+      if (!exists && task.tags.length < 10) {
+        task.tags.push({ text, color: tag.color });
+        await task.save();
+        await logActivity(task.boardId.toString(), user, 'updated', task, `etiqueta "${text}"`);
+      }
+    }
+
+    for (const boardId of checked.boardIds) {
+      revalidatePath(`/board/${boardId}`);
+    }
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al etiquetar tareas:', error);
+    return { success: false, error: 'Error al etiquetar las tareas' };
   }
 }

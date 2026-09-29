@@ -8,7 +8,7 @@ import Note from '@/models/Note';
 import Task from '@/models/Task';
 import bcrypt from 'bcryptjs';
 import { isValidObjectId } from '@/lib/utils';
-import { ApiResponse, IUser } from '@/types';
+import { ApiResponse, IUser, INotificationPrefs } from '@/types';
 import { getAuthUser, getSharedUserScope } from '@/lib/auth-helpers';
 import { deleteS3Prefix, S3_KEY_PREFIX } from '@/lib/s3';
 
@@ -201,5 +201,48 @@ export async function deleteAccount(password: string): Promise<ApiResponse<null>
   } catch (error) {
     console.error('Error al eliminar cuenta:', error);
     return { success: false, error: 'Error al eliminar la cuenta' };
+  }
+}
+
+// Actualizar preferencias de notificación del usuario autenticado
+export async function updateNotificationPrefs(
+  prefs: Partial<INotificationPrefs>
+): Promise<ApiResponse<INotificationPrefs>> {
+  try {
+    const authUser = await getAuthUser();
+    if (!authUser) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const keys: (keyof INotificationPrefs)[] = [
+      'assigned', 'comment', 'reply', 'mention', 'invite', 'member', 'reminder', 'emailEnabled',
+    ];
+
+    const $set: Record<string, boolean> = {};
+    for (const key of keys) {
+      const value = prefs[key];
+      if (typeof value === 'boolean') {
+        $set[`notificationPrefs.${key}`] = value;
+      }
+    }
+
+    if (Object.keys($set).length === 0) {
+      return { success: false, error: 'No hay preferencias para actualizar' };
+    }
+
+    await connectDB();
+    const updated = await User.findByIdAndUpdate(
+      authUser.id,
+      { $set },
+      { new: true }
+    ).select('notificationPrefs').lean();
+
+    return {
+      success: true,
+      data: JSON.parse(JSON.stringify(updated?.notificationPrefs ?? prefs)),
+    };
+  } catch (error) {
+    console.error('Error al actualizar preferencias:', error);
+    return { success: false, error: 'Error al guardar las preferencias' };
   }
 }

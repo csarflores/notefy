@@ -114,3 +114,29 @@ export async function sendVerificationEmail(
     `,
   });
 }
+
+export async function sendNotificationEmail(
+  to: string,
+  name: string,
+  message: string,
+  link?: string
+): Promise<void> {
+  const transporter = getTransporter();
+  const baseUrl = process.env.NEXTAUTH_URL ?? '';
+  const url = link ? `${baseUrl}${link}` : baseUrl;
+
+  await transporter.sendMail({
+    from: `"Harold" <${EMAIL_USER}>`,
+    to,
+    subject: `${message} - Harold`,
+    text: `Hola ${name},\n\n${message}\n\n${url ? `Ver en Harold: ${url}\n\n` : ''}Puedes desactivar las notificaciones por email en Configuración.`,
+    html: `
+      <div style="font-family: -apple-system, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #1d1d1f;">Nueva actividad</h2>
+        <p style="color: #555;">${message}</p>
+        ${url ? `<p style="margin: 24px 0;"><a href="${url}" style="background: #0066cc; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; display: inline-block;">Ver en Harold</a></p>` : ''}
+        <p style="color: #999; font-size: 12px;">Puedes desactivar las notificaciones por email en Configuración → Notificaciones.</p>
+      </div>
+    `,
+  });
+}

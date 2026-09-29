@@ -10,6 +10,7 @@ import { IProject } from '@/types';
 import { useSession } from 'next-auth/react';
 import { X, Palette } from 'lucide-react';
 import { PROJECT_COLORS } from '@/constants/project-colors';
+import IconPicker from '@/components/ui/IconPicker';
 
 interface CreateBoardModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#6b7280');
+  const [icon, setIcon] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId || null);
   const [availableProjects, setAvailableProjects] = useState<IProject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -75,6 +77,7 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
         name: name.trim(),
         description: description.trim(),
         color: color,
+        icon: icon || undefined,
         projectId: selectedProjectId,
       };
       const result = template === 'none'
@@ -100,6 +103,7 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
       setName('');
       setDescription('');
       setColor('#6b7280');
+      setIcon('');
       setShowColorPicker(false);
       setTemplate('none');
       onClose();
@@ -147,14 +151,15 @@ export default function CreateBoardModal({ isOpen, onClose, userId, projectId }:
     >
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
 
-        {/* Selector de Color */}
+        {/* Selector de Color + Icono */}
         <div>
           <label className="block text-sm font-medium text-[#1d1d1f] mb-2">
-            Color del Tablero
+            Color e icono
           </label>
           <div className="space-y-3">
             {/* Color seleccionado actual */}
             <div className="flex items-center gap-3">
+              <IconPicker value={icon} onChange={setIcon} />
               <button
                 type="button"
                 onClick={() => setShowColorPicker(!showColorPicker)}

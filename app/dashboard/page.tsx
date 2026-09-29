@@ -162,15 +162,16 @@ export default async function DashboardPage() {
           <MyDayWidget userId={session.user.id} />
         </div>
 
+         {/* Actividad reciente */}
+        <RecentActivity />
+
         {/* Lista de proyectos y tableros */}
         <div className="mt-4 sm:mt-5">
           <Suspense fallback={<ProjectsLoading />}>
             <ProjectsAndBoardsList userId={session.user.id} />
           </Suspense>
         </div>
-
-        {/* Actividad reciente */}
-        <RecentActivity />
+       
       </div>
 
       <Footer />

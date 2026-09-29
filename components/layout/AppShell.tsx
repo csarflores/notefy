@@ -13,6 +13,7 @@ import CreateProjectGroupModal from '@/components/dashboard/CreateProjectGroupMo
 import CreateBoardModal from '@/components/dashboard/CreateBoardModal';
 import CreateNoteModal from '@/components/notes/CreateNoteModal';
 import ShortcutsModal from '@/components/ui/ShortcutsModal';
+import PWASetup from '@/components/pwa/PWASetup';
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
@@ -100,6 +101,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         isOpen={shortcutsModal}
         onClose={() => setShortcutsModal(false)}
       />
+      <PWASetup />
     </SidebarProvider>
     </CommandPaletteProvider>
   );

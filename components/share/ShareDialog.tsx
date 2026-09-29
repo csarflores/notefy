@@ -20,6 +20,7 @@ import {
   ResourceMembersResult,
 } from '@/actions/invitation-actions';
 import { createPublicNoteLink, revokePublicNoteLink } from '@/actions/note-actions';
+import { createPublicBoardLink, revokePublicBoardLink } from '@/actions/board-actions';
 import { MEMBER_ROLE_LABELS, rolesForResource, RESOURCE_TYPE_LABELS } from '@/lib/roles';
 import { MemberRole, ResourceType } from '@/types';
 import {
@@ -50,8 +51,9 @@ interface ShareDialogProps {
   resourceId: string;
   resourceName: string;
   ownerId: string;
-  /** Solo notas: token del link público actual (si existe) */
+  /** Token del link público actual (si existe) — notas y tableros */
   notePublicToken?: string | null;
+  boardPublicToken?: string | null;
 }
 
 export default function ShareDialog({
@@ -62,6 +64,7 @@ export default function ShareDialog({
   resourceName,
   ownerId,
   notePublicToken,
+  boardPublicToken,
 }: ShareDialogProps) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -80,7 +83,9 @@ export default function ShareDialog({
   const [pending, setPending] = useState<PendingInvite[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [publicToken, setPublicToken] = useState<string | null>(notePublicToken ?? null);
+  const [publicToken, setPublicToken] = useState<string | null>(
+    notePublicToken ?? boardPublicToken ?? null
+  );
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
 
@@ -210,14 +215,19 @@ export default function ShareDialog({
     showNotification('Link de invitación copiado', 'success');
   };
 
-  // ─── Link público (notas) ──────────────────────────────────────────────────
+  // ─── Link público (notas y tableros) ───────────────────────────────────────
+  const publicPath = resourceType === 'board' ? 'share/board' : 'share/note';
+
   const handleCreatePublicLink = async () => {
     setBusy('public-link');
-    const result = await createPublicNoteLink(resourceId, currentUserId);
+    const result =
+      resourceType === 'board'
+        ? await createPublicBoardLink(resourceId, currentUserId)
+        : await createPublicNoteLink(resourceId, currentUserId);
     setBusy(null);
     if (result.success && result.data) {
       setPublicToken(result.data.token);
-      navigator.clipboard.writeText(`${window.location.origin}/share/note/${result.data.token}`);
+      navigator.clipboard.writeText(`${window.location.origin}/${publicPath}/${result.data.token}`);
       showNotification('Link público creado y copiado', 'success');
       router.refresh();
     } else {
@@ -227,7 +237,10 @@ export default function ShareDialog({
 
   const handleRevokePublicLink = async () => {
     setBusy('public-link');
-    const result = await revokePublicNoteLink(resourceId, currentUserId);
+    const result =
+      resourceType === 'board'
+        ? await revokePublicBoardLink(resourceId, currentUserId)
+        : await revokePublicNoteLink(resourceId, currentUserId);
     setBusy(null);
     if (result.success) {
       setPublicToken(null);
@@ -239,7 +252,7 @@ export default function ShareDialog({
   };
 
   const handleCopyPublicLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/share/note/${publicToken}`);
+    navigator.clipboard.writeText(`${window.location.origin}/${publicPath}/${publicToken}`);
     showNotification('Link público copiado', 'success');
   };
 
@@ -489,8 +502,8 @@ export default function ShareDialog({
             </div>
           )}
 
-          {/* Link público de solo lectura (notas, solo propietario) */}
-          {resourceType === 'note' && isOwner && (
+          {/* Link público de solo lectura (notas y tableros, solo propietario) */}
+          {(resourceType === 'note' || resourceType === 'board') && isOwner && (
             <div className="pt-4 border-t border-[#f0f0f2]">
               <h4 className="text-[12px] font-semibold text-[#8e8e93] uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
                 <Globe size={12} />
@@ -499,7 +512,7 @@ export default function ShareDialog({
               {publicToken ? (
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-[#f5f5f7] text-[12px] text-[#7a7a7a] truncate">
-                    /share/note/{publicToken.slice(0, 12)}…
+                    /{publicPath}/{publicToken.slice(0, 12)}…
                   </div>
                   <button
                     onClick={handleCopyPublicLink}

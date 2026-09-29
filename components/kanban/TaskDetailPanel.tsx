@@ -19,6 +19,7 @@ import {
 } from '@/actions/task-actions';
 import { getBoardUsers, getBoardColumnsAction } from '@/actions/board-actions';
 import { getBoardTags } from '@/actions/tag-actions';
+import { getTaskActivity } from '@/actions/activity-actions';
 import {
   setTaskCover,
   clearTaskCover,
@@ -34,7 +35,9 @@ import {
   ITask,
   ITaskAttachment,
   IUser,
+  IActivity,
   TaskPriority,
+  TaskRecurrence,
   IBoardColumn,
   UpdateTaskInput,
 } from '@/types';
@@ -57,6 +60,8 @@ import {
   Tags,
   AlignLeft,
   Loader2,
+  Repeat,
+  History,
 } from 'lucide-react';
 import { generateRandomColor, escapeRegExp } from '@/lib/utils';
 import { PRIORITY_OPTIONS } from './PriorityPicker';
@@ -79,6 +84,16 @@ function formatFileSize(size: number): string {
     ? `${(size / 1048576).toFixed(1)} MB`
     : `${Math.max(1, Math.round(size / 1024))} KB`;
 }
+
+const ACTIVITY_LABELS: Record<IActivity['action'], string> = {
+  created: 'creó esta tarea',
+  updated: 'actualizó esta tarea',
+  moved: 'movió esta tarea a',
+  completed: 'completó esta tarea',
+  deleted: 'eliminó esta tarea',
+  commented: 'comentó en esta tarea',
+  assigned: 'cambió los asignados',
+};
 
 // boardId puede venir poblado (documento) o como ObjectId
 function getTaskBoardId(boardId: ITask['boardId']): string | undefined {
@@ -162,6 +177,8 @@ export default function TaskDetailPanel({
   const [projectTags, setProjectTags] = useState<ITag[]>([]);
   const [dueDate, setDueDate] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
+  const [recurrence, setRecurrence] = useState<TaskRecurrence | null>(null);
+  const [activity, setActivity] = useState<IActivity[]>([]);
   const [checklist, setChecklist] = useState<IChecklistItem[]>([]);
   const [newChecklistText, setNewChecklistText] = useState('');
   const [comments, setComments] = useState<IComment[]>([]);
@@ -260,6 +277,7 @@ export default function TaskDetailPanel({
         setDeliveryDate(
           task.deliveryDate ? new Date(task.deliveryDate).toISOString().split('T')[0] : ''
         );
+        setRecurrence(task.recurrence ?? null);
       }
     } else {
       const valid = boardColumns.some((c) => c.id === defaultStatus);
@@ -274,6 +292,17 @@ export default function TaskDetailPanel({
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
   }, [title, isOpen]);
+
+  // Cargar el historial de actividad de la tarea (solo modo edición)
+  useEffect(() => {
+    if (!isOpen || !isEdit || !taskId) {
+      setActivity([]);
+      return;
+    }
+    getTaskActivity(taskId).then((res) => {
+      if (res.success && res.data) setActivity(res.data);
+    });
+  }, [isOpen, isEdit, taskId, saveState]);
 
   // ─── Autosave (modo edición) ──────────────────────────────────────────────
   const saveField = useCallback(
@@ -345,6 +374,7 @@ export default function TaskDetailPanel({
     setDeliveryDate('');
     setStatus(boardColumns[0]?.id || 'todo');
     setPriority(null);
+    setRecurrence(null);
     setCoverFile(null);
     setCoverPreview('');
     setAttachmentFiles([]);
@@ -375,6 +405,7 @@ export default function TaskDetailPanel({
         priority,
         dueDate: dueDate || null,
         deliveryDate: deliveryDate || null,
+        recurrence,
       });
 
       if (result.success && result.data) {
@@ -607,6 +638,11 @@ export default function TaskDetailPanel({
   const handleSelectPriority = (value: TaskPriority | null) => {
     setPriority(value);
     if (isEdit) saveField({ priority: value });
+  };
+
+  const handleSelectRecurrence = (value: TaskRecurrence | null) => {
+    setRecurrence(value);
+    if (isEdit) saveField({ recurrence: value });
   };
 
   const handleDateChange = (field: 'dueDate' | 'deliveryDate', value: string) => {
@@ -863,6 +899,41 @@ export default function TaskDetailPanel({
               </div>
             </PropertyRow>
 
+            <PropertyRow icon={<Repeat size={13} />} label="Repetir">
+              <div className="flex gap-1 flex-wrap">
+                {(
+                  [
+                    { value: null, label: 'Nunca' },
+                    { value: 'daily', label: 'Diaria' },
+                    { value: 'weekly', label: 'Semanal' },
+                    { value: 'monthly', label: 'Mensual' },
+                  ] as { value: TaskRecurrence | null; label: string }[]
+                ).map((option) => {
+                  const isActive = recurrence === option.value;
+                  return (
+                    <button
+                      key={option.value ?? 'none'}
+                      type="button"
+                      onClick={() => handleSelectRecurrence(option.value)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-medium transition-all ${
+                        isActive
+                          ? 'bg-white text-[#3a3a3c] ring-1 ring-[#c7c7cc] shadow-sm'
+                          : 'text-[#8e8e93] hover:bg-white hover:text-[#3a3a3c]'
+                      }`}
+                      disabled={busy}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {recurrence && (
+                <p className="text-[10.5px] text-[#a0a0a8] mt-1">
+                  Al completarla se creará la siguiente ocurrencia automáticamente.
+                </p>
+              )}
+            </PropertyRow>
+
             <div className="flex gap-3 py-1.5">
               <div className="w-[104px] shrink-0 flex items-center gap-1.5 pt-1 text-[12px] text-[#8e8e93]">
                 <Calendar size={13} />
@@ -1051,7 +1122,7 @@ export default function TaskDetailPanel({
                           {item.done && <Check size={10} strokeWidth={3} />}
                         </button>
                         <span
-                          className={`flex-1 text-[12px] break-words ${
+                          className={`flex-1 text-[12px] wrap-break-word ${
                             item.done ? 'text-[#a0a0a8] line-through' : 'text-[#1d1d1f]'
                           }`}
                         >
@@ -1230,7 +1301,7 @@ export default function TaskDetailPanel({
                                 </button>
                               )}
                             </div>
-                            <p className="text-[13px] text-[#3a3a3c] leading-relaxed mt-0.5 break-words whitespace-pre-wrap">
+                            <p className="text-[13px] text-[#3a3a3c] leading-relaxed mt-0.5 wrap-break-word whitespace-pre-wrap">
                               {comment.content}
                             </p>
                             {canComment && (
@@ -1283,7 +1354,7 @@ export default function TaskDetailPanel({
                                         </button>
                                       )}
                                     </div>
-                                    <p className="text-[13px] text-[#3a3a3c] leading-relaxed mt-0.5 break-words whitespace-pre-wrap">
+                                    <p className="text-[13px] text-[#3a3a3c] leading-relaxed mt-0.5 wrap-break-word whitespace-pre-wrap">
                                       {reply.content}
                                     </p>
                                   </div>
@@ -1363,6 +1434,33 @@ export default function TaskDetailPanel({
                 </div>
               </div>
               )}
+            </div>
+          )}
+
+          {/* Historial de actividad (solo edición) */}
+          {isEdit && activity.length > 0 && (
+            <div className="mt-6 pt-4 border-t border-[#f0f0f2]">
+              <div className="flex items-center gap-1.5 mb-3 text-[#8e8e93]">
+                <History size={12} />
+                <SectionLabel>Actividad</SectionLabel>
+              </div>
+              <ul className="space-y-2.5">
+                {activity.map((item) => (
+                  <li key={item._id.toString()} className="flex items-start gap-2.5">
+                    <Avatar src={item.actorImage} name={item.actorName} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] text-[#3a3a3c] leading-snug">
+                        <span className="font-semibold">{item.actorName}</span>{' '}
+                        {ACTIVITY_LABELS[item.action]}
+                        {item.detail ? `: ${item.detail}` : ''}
+                      </p>
+                      <p className="text-[10.5px] text-[#c7c7cc]">
+                        {formatCommentDate(item.createdAt)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

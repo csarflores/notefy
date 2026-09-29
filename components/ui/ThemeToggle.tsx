@@ -2,28 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
-
-type Theme = 'light' | 'dark' | 'system';
-
-function applyTheme(theme: Theme) {
-  const isDark =
-    theme === 'dark' ||
-    (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark', isDark);
-  try {
-    localStorage.setItem('harold-theme', theme);
-  } catch {}
-}
+import { Theme, applyTheme, getStoredTheme } from '@/lib/theme';
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>('system');
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('harold-theme') as Theme | null;
-      if (stored === 'dark' || stored === 'light' || stored === 'system') setTheme(stored);
-      else if (document.documentElement.classList.contains('dark')) setTheme('dark');
-    } catch {}
+    const stored = getStoredTheme();
+    if (stored !== 'system') setTheme(stored);
+    else if (document.documentElement.classList.contains('dark')) setTheme('dark');
   }, []);
 
   // Reaccionar a cambios del sistema cuando está en "system"

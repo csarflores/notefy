@@ -7,10 +7,13 @@ const Footer = () => {
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-center">
                     <div className="flex items-center gap-2 text-[#6b7280] text-sm">
                         <span className="font-medium">© {new Date().getFullYear()} Harold</span>
+                        <span className="text-[#d1d5db]">•</span>
+                        <span className="text-[#9ca3af]">Un producto de <a href="https://nutbell.net" className="text-[#ffb300]" target="_blank">Nutbell</a></span>
                     </div>
                     
                     <div className="flex items-center gap-2 text-xs">
-                        <span className="text-[#6b7280]">Proyecto de código abierto</span>
+                        <span className="text-[#d1d5db]">•</span>
+                        <span className="text-[#9ca3af]">Proyecto de código abierto</span>
                         <span className="text-[#d1d5db]">•</span>
                         <span className="text-[#9ca3af]">Licenciado bajo MIT License</span>
                     </div>

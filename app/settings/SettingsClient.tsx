@@ -8,11 +8,12 @@ import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useUpload } from '@/hooks/useUpload';
 import { setUserAvatar, removeUserAvatar } from '@/actions/upload-actions';
-import { updateUserProfile, changePassword, deleteAccount } from '@/actions/user-actions';
+import { updateUserProfile, changePassword, deleteAccount, updateNotificationPrefs } from '@/actions/user-actions';
+import { exportAccountJSON, importAccountBackup } from '@/actions/export-actions';
 import { useNotification } from '@/components/ui/NotificationContext';
 import ThemeToggle from '@/components/ui/ThemeToggle';
-import { Camera, Trash2, KeyRound, AlertTriangle } from 'lucide-react';
-import { IUser } from '@/types';
+import { Camera, Trash2, KeyRound, AlertTriangle, Bell, Download, Upload } from 'lucide-react';
+import { IUser, INotificationPrefs } from '@/types';
 
 export default function SettingsClient({ user }: { user: IUser }) {
   const router = useRouter();
@@ -33,6 +34,75 @@ export default function SettingsClient({ user }: { user: IUser }) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const [notifPrefs, setNotifPrefs] = useState<INotificationPrefs>({
+    assigned: user.notificationPrefs?.assigned ?? true,
+    comment: user.notificationPrefs?.comment ?? true,
+    reply: user.notificationPrefs?.reply ?? true,
+    mention: user.notificationPrefs?.mention ?? true,
+    invite: user.notificationPrefs?.invite ?? true,
+    member: user.notificationPrefs?.member ?? true,
+    reminder: user.notificationPrefs?.reminder ?? true,
+    emailEnabled: user.notificationPrefs?.emailEnabled ?? false,
+  });
+
+  const handleTogglePref = async (key: keyof INotificationPrefs) => {
+    const next = { ...notifPrefs, [key]: !notifPrefs[key] };
+    setNotifPrefs(next);
+    const result = await updateNotificationPrefs({ [key]: next[key] });
+    if (!result.success) {
+      setNotifPrefs(notifPrefs);
+      showNotification(result.error || 'Error al guardar preferencias', 'error');
+    }
+  };
+
+  // ─── Backup ────────────────────────────────────────────────────────────────
+  const backupInputRef = useRef<HTMLInputElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExportBackup = async () => {
+    setIsExporting(true);
+    const result = await exportAccountJSON(user._id.toString());
+    setIsExporting(false);
+    if (result.success && result.data) {
+      const blob = new Blob([result.data.json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.data.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotification('Backup descargado', 'success');
+    } else {
+      showNotification(result.error || 'Error al exportar', 'error');
+    }
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const result = await importAccountBackup(user._id.toString(), text);
+      if (result.success && result.data) {
+        const { projects, boards, tasks, notes } = result.data;
+        showNotification(
+          `Restaurado: ${projects} proyectos, ${boards} tableros, ${tasks} tareas, ${notes} notas`,
+          'success'
+        );
+        router.refresh();
+      } else {
+        showNotification(result.error || 'Error al restaurar el backup', 'error');
+      }
+    } catch {
+      showNotification('Error al leer el archivo', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -192,6 +262,77 @@ export default function SettingsClient({ user }: { user: IUser }) {
         <ThemeToggle />
       </section>
 
+      {/* Notificaciones */}
+      <section className="bg-white rounded-xl border border-[#e0e0e0] p-5 sm:p-6">
+        <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-1 flex items-center gap-2">
+          <Bell size={15} className="text-[#7a7a7a]" />
+          Notificaciones
+        </h2>
+        <p className="text-[12px] text-[#7a7a7a] mb-4">
+          Elige qué avisos quieres recibir dentro de la app.
+        </p>
+        <div className="space-y-1">
+          {(
+            [
+              ['assigned', 'Te asignan una tarea'],
+              ['comment', 'Comentarios en tus tareas o notas'],
+              ['reply', 'Respuestas a tus comentarios'],
+              ['mention', 'Menciones con @tu nombre'],
+              ['invite', 'Invitaciones a colaborar'],
+              ['member', 'Cambios de miembros y roles'],
+              ['reminder', 'Recordatorios de tareas próximas'],
+            ] as [keyof INotificationPrefs, string][]
+          ).map(([key, label]) => (
+            <label
+              key={key}
+              className="flex items-center justify-between gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-[#fafafa] cursor-pointer"
+            >
+              <span className="text-[13px] text-[#3a3a3c]">{label}</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notifPrefs[key]}
+                aria-label={label}
+                onClick={() => handleTogglePref(key)}
+                className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+                  notifPrefs[key] ? 'bg-[#0066cc]' : 'bg-[#d1d1d6]'
+                }`}
+              >
+                <span
+                  className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
+                  style={{ transform: notifPrefs[key] ? 'translateX(16px)' : 'translateX(0)' }}
+                />
+              </button>
+            </label>
+          ))}
+        </div>
+        <div className="mt-4 pt-4 border-t border-[#f0f0f2]">
+          <label className="flex items-center justify-between gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-[#fafafa] cursor-pointer">
+            <div>
+              <span className="text-[13px] font-medium text-[#1d1d1f]">Notificaciones por email</span>
+              <p className="text-[11px] text-[#a0a0a8]">
+                Recibe además un correo por cada notificación activa.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={notifPrefs.emailEnabled}
+              aria-label="Notificaciones por email"
+              onClick={() => handleTogglePref('emailEnabled')}
+              className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+                notifPrefs.emailEnabled ? 'bg-[#0066cc]' : 'bg-[#d1d1d6]'
+              }`}
+            >
+              <span
+                className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow"
+                style={{ transform: notifPrefs.emailEnabled ? 'translateX(16px)' : 'translateX(0)' }}
+              />
+            </button>
+          </label>
+        </div>
+      </section>
+
       {/* Datos personales */}
       <section className="bg-white rounded-xl border border-[#e0e0e0] p-5 sm:p-6">
         <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-4">Datos personales</h2>
@@ -303,6 +444,47 @@ export default function SettingsClient({ user }: { user: IUser }) {
             Cambiar contraseña
           </Button>
         </div>
+      </section>
+
+      {/* Exportar / importar datos */}
+      <section className="bg-white rounded-xl border border-[#e0e0e0] p-5 sm:p-6">
+        <h2 className="text-[15px] font-semibold text-[#1d1d1f] mb-1 flex items-center gap-2">
+          <Download size={15} className="text-[#7a7a7a]" />
+          Tus datos
+        </h2>
+        <p className="text-[12px] text-[#7a7a7a] mb-4">
+          Descarga un backup de tus proyectos, tableros, tareas y notas en JSON, o restáuralo más tarde.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={handleExportBackup}
+            size="sm"
+            variant="secondary"
+            isLoading={isExporting}
+          >
+            <Download size={14} className="mr-1.5" />
+            Descargar backup (JSON)
+          </Button>
+          <Button
+            onClick={() => backupInputRef.current?.click()}
+            size="sm"
+            variant="ghost"
+            isLoading={isImporting}
+          >
+            <Upload size={14} className="mr-1.5" />
+            Restaurar backup
+          </Button>
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleImportBackup}
+          />
+        </div>
+        <p className="text-[11px] text-[#a0a0a8] mt-3">
+          Al restaurar se crean copias nuevas — no se sobrescribe ni elimina nada existente.
+        </p>
       </section>
 
       {/* Zona de peligro */}

@@ -166,3 +166,48 @@ export async function getMyDayTasks(): Promise<ApiResponse<{ overdue: ITask[]; t
     return { success: false, error: 'Error al obtener las tareas del día' };
   }
 }
+
+// "Mis tareas": todas las tareas asignadas al usuario en tableros accesibles
+export async function getMyTasks(): Promise<ApiResponse<ITask[]>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    await connectDB();
+
+    const boards = await Board.find({
+      deletedAt: null,
+      $or: [{ owner: user.id }, { members: user.email }],
+    }).select('_id columns').lean();
+
+    // Excluir la columna "completada" de cada tablero (última columna)
+    const notDone = boards.map((b) => ({
+      boardId: b._id,
+      status: { $ne: getDoneColumnId(b.columns) },
+    }));
+
+    const tasks = await Task.find({
+      deletedAt: null,
+      assignedTo: user.id,
+      ...(notDone.length > 0 ? { $or: notDone } : { boardId: { $in: boards.map((b) => b._id) } }),
+    })
+      .populate([
+        { path: 'assignedTo', select: 'name email image' },
+        {
+          path: 'boardId',
+          select: 'name projectId color columns icon owner memberRoles',
+          populate: { path: 'projectId', select: 'name color icon' },
+        },
+      ])
+      .sort({ deliveryDate: 1, dueDate: 1, updatedAt: -1 })
+      .limit(500)
+      .lean();
+
+    return { success: true, data: JSON.parse(JSON.stringify(tasks)) };
+  } catch (error) {
+    console.error('Error al obtener mis tareas:', error);
+    return { success: false, error: 'Error al obtener las tareas' };
+  }
+}

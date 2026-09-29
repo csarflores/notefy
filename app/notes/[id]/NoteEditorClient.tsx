@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import NoteEditor from '@/components/notes/NoteEditor';
-import { ArrowLeft, Trash2, Lock, Globe, Edit2, Save, Check, Loader2, MoreHorizontal, FileDown, Printer, Link2, CornerUpLeft, Share2, Eye } from 'lucide-react';
+import { ArrowLeft, Trash2, Lock, Globe, Edit2, Save, Check, Loader2, MoreHorizontal, FileDown, Printer, Link2, CornerUpLeft, Share2, Eye, History } from 'lucide-react';
 import { INote, MemberRole } from '@/types';
 import { updateNote, deleteNote, getNoteLinks } from '@/actions/note-actions';
 import { exportNoteAsMarkdown, printNoteAsPdf } from '@/lib/export';
@@ -11,6 +12,8 @@ import { escapeRegExp } from '@/lib/utils';
 import { useNotification } from '@/components/ui/NotificationContext';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import ShareDialog from '@/components/share/ShareDialog';
+import NoteVersionsPanel from '@/components/notes/NoteVersionsPanel';
+import NoteComments from '@/components/notes/NoteComments';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -22,7 +25,9 @@ interface NoteLinkItem {
 
 export function NoteEditorClient({ note, userId, userRole }: { note: INote; userId: string; userRole: MemberRole | 'owner' }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const { showNotification } = useNotification();
+  const [noteTitle, setNoteTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [savedContent, setSavedContent] = useState(note.content);
   const [editorKey, setEditorKey] = useState(0);
@@ -34,6 +39,7 @@ export function NoteEditorClient({ note, userId, userRole }: { note: INote; user
   const [backlinks, setBacklinks] = useState<NoteLinkItem[]>([]);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savingRef = useRef(false);
   const isNoteOwner = userRole === 'owner';
@@ -155,7 +161,7 @@ export function NoteEditorClient({ note, userId, userRole }: { note: INote; user
           {/* Título + visibilidad */}
           <div className="flex items-center gap-2 min-w-0 flex-1 px-1">
             <span className="text-[14px] font-semibold text-[#1d1d1f] tracking-tight truncate leading-none">
-              {note.title}
+              {noteTitle}
             </span>
             <span className={`hidden sm:flex items-center gap-1 shrink-0 text-[11px] px-1.5 py-0.5 rounded-md font-medium ${
               note.visibility === 'private'
@@ -216,6 +222,16 @@ export function NoteEditorClient({ note, userId, userRole }: { note: INote; user
               </button>
             </div>
           )}
+
+          {/* Historial de versiones */}
+          <button
+            onClick={() => setVersionsOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-[#7a7a7a] hover:bg-[#f5f5f7] hover:text-[#1d1d1f] transition-colors shrink-0"
+            title="Historial de versiones"
+          >
+            <History size={13} />
+            <span className="hidden sm:inline">Historial</span>
+          </button>
 
           {/* Compartir */}
           <button
@@ -347,7 +363,37 @@ export function NoteEditorClient({ note, userId, userRole }: { note: INote; user
             )}
           </div>
         )}
+
+        {/* Comentarios de la nota */}
+        {!isEditing && (
+          <div className="max-w-7xl mx-auto">
+            <NoteComments
+              noteId={note._id.toString()}
+              initialComments={note.comments ?? []}
+              currentUserId={userId}
+              currentUserName={session?.user?.name ?? ''}
+              currentUserImage={session?.user?.image ?? undefined}
+              isNoteOwner={isNoteOwner}
+              canComment={canEditNote || note.visibility === 'shared'}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Panel de historial de versiones */}
+      <NoteVersionsPanel
+        isOpen={versionsOpen}
+        onClose={() => setVersionsOpen(false)}
+        noteId={note._id.toString()}
+        canEdit={canEditNote}
+        onRestored={(title, restoredContent) => {
+          setNoteTitle(title);
+          setContent(restoredContent);
+          setSavedContent(restoredContent);
+          setEditorKey((k) => k + 1);
+          setIsEditing(false);
+        }}
+      />
 
       {/* Diálogo de compartir */}
       <ShareDialog

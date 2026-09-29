@@ -139,6 +139,8 @@ export const authOptions: NextAuthOptions = {
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === 'development',
+  // Opt-in: NEXTAUTH_DEBUG=true. No activar por defecto — en debug next-auth
+  // imprime la config de providers en consola, incluido GOOGLE_CLIENT_SECRET.
+  debug: process.env.NEXTAUTH_DEBUG === 'true',
   useSecureCookies: process.env.NODE_ENV === 'production',
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, ReactNode, useEffect } from 'react';
+import { Fragment, ReactNode, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,16 +15,46 @@ interface ModalProps {
   headerContent?: ReactNode;
 }
 
+const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export default function Modal({ isOpen, onClose, title, children, className, headerContent }: ModalProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<Element | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
     const id = Symbol('modal');
     overlayStack.push(id);
+    previouslyFocused.current = document.activeElement;
+
+    // Foco inicial dentro del modal
+    setTimeout(() => {
+      const first = contentRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+      first?.focus();
+    }, 30);
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && overlayStack[overlayStack.length - 1] === id) {
+      if (overlayStack[overlayStack.length - 1] !== id) return;
+      if (e.key === 'Escape') {
         e.stopPropagation();
         onClose();
+        return;
+      }
+      // Focus trap: mantener Tab dentro del modal
+      if (e.key === 'Tab' && contentRef.current) {
+        const focusable = Array.from(
+          contentRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)
+        ).filter((el) => !el.hasAttribute('disabled'));
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     document.addEventListener('keydown', onKeyDown);
@@ -34,6 +64,9 @@ export default function Modal({ isOpen, onClose, title, children, className, hea
       if (idx !== -1) overlayStack.splice(idx, 1);
       document.removeEventListener('keydown', onKeyDown);
       if (overlayStack.length === 0) document.body.style.overflow = '';
+      if (previouslyFocused.current instanceof HTMLElement) {
+        previouslyFocused.current.focus();
+      }
     };
   }, [isOpen, onClose]);
   return (
@@ -67,6 +100,10 @@ export default function Modal({ isOpen, onClose, title, children, className, hea
                 className
               )}
               onClick={(e) => e.stopPropagation()}
+              ref={contentRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label={title}
             >
               {/* Header */}
               {headerContent ? (

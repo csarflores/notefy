@@ -1,18 +1,30 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useRef } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 type NotificationType = 'success' | 'error' | 'info';
+
+interface NotificationAction {
+  label: string;
+  onClick: () => void;
+}
 
 interface Notification {
   id: string;
   message: string;
   type: NotificationType;
+  action?: NotificationAction;
+  duration: number;
+}
+
+interface ShowOptions {
+  action?: NotificationAction;
+  duration?: number;
 }
 
 interface NotificationContextType {
-  showNotification: (message: string, type?: NotificationType) => void;
+  showNotification: (message: string, type?: NotificationType, options?: ShowOptions) => void;
   notifications: Notification[];
   removeNotification: (id: string) => void;
 }
@@ -21,15 +33,17 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const counter = useRef(0);
 
-  const showNotification = (message: string, type: NotificationType = 'info') => {
-    const id = Date.now().toString();
-    setNotifications((prev) => [...prev, { id, message, type }]);
-    
-    // Auto-remove after 3 seconds
+  const showNotification = (message: string, type: NotificationType = 'info', options?: ShowOptions) => {
+    const id = `${Date.now()}-${counter.current++}`;
+    const duration = options?.action ? (options.duration ?? 6000) : (options?.duration ?? 3000);
+    setNotifications((prev) => [...prev, { id, message, type, action: options?.action, duration }]);
+
+    // Auto-remove after duration (las notificaciones con acción duran más)
     setTimeout(() => {
       removeNotification(id);
-    }, 3000);
+    }, duration);
   };
 
   const removeNotification = (id: string) => {
@@ -79,6 +93,17 @@ function NotificationContainer() {
           >
             <Icon size={16} className={`${iconClass} shrink-0`} />
             <span className="flex-1 leading-snug">{notification.message}</span>
+            {notification.action && (
+              <button
+                onClick={() => {
+                  notification.action!.onClick();
+                  removeNotification(notification.id);
+                }}
+                className="shrink-0 px-2.5 py-1 rounded-full text-[12px] font-semibold text-[#0066cc] hover:bg-[#0066cc]/10 dark:text-[#409cff] transition-colors"
+              >
+                {notification.action.label}
+              </button>
+            )}
             <button
               onClick={() => removeNotification(notification.id)}
               aria-label="Cerrar notificación"

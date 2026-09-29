@@ -1,6 +1,30 @@
 import mongoose, { Schema, Model } from 'mongoose';
 import { INote } from '@/types';
 
+const NoteVersionSchema = new Schema(
+  {
+    title: { type: String, required: true, maxlength: 200 },
+    content: { type: String, default: '', maxlength: 100000 },
+    savedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    savedByName: { type: String, default: '' },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+
+const NoteCommentSchema = new Schema(
+  {
+    authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    authorName: { type: String, required: true },
+    authorImage: { type: String, default: null },
+    content: {
+      type: String,
+      required: true,
+      maxlength: [2000, 'El comentario no puede exceder 2000 caracteres'],
+    },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+
 const NoteSchema = new Schema<INote>(
   {
     title: {
@@ -66,6 +90,20 @@ const NoteSchema = new Schema<INote>(
         },
         message: 'El color debe ser un código hexadecimal válido (ej: #f59e0b)',
       },
+    },
+    versions: {
+      type: [NoteVersionSchema],
+      default: [],
+      validate: {
+        validator: function (versions: unknown[]) {
+          return versions.length <= 30;
+        },
+        message: 'El historial de versiones no puede exceder 30 entradas',
+      },
+    },
+    comments: {
+      type: [NoteCommentSchema],
+      default: [],
     },
     deletedAt: {
       type: Date,

@@ -9,8 +9,10 @@ import Avatar from '@/components/ui/Avatar';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import TaskDetailPanel from './TaskDetailPanel';
 import { PriorityFlag } from './PriorityPicker';
+import SidebarContextMenu from '@/components/layout/SidebarContextMenu';
 import { MoreVertical, Edit2, Trash2, Check, Calendar, Clock, MessageSquare, Paperclip, ListChecks } from 'lucide-react';
 import { deleteTask } from '@/actions/task-actions';
+import { restoreItem } from '@/actions/trash-actions';
 import { useNotification } from '@/components/ui/NotificationContext';
 
 function getDateTone(dateStr: string | Date, isDone: boolean): 'overdue' | 'today' | 'normal' {
@@ -40,14 +42,16 @@ interface TaskCardProps {
   isDone?: boolean;
   canEdit?: boolean;
   canComment?: boolean;
+  compact?: boolean;
 }
 
-export default function TaskCard({ task, canDelete = false, selectionMode = false, isSelected = false, onToggleSelection, isDone, canEdit = true, canComment = true }: TaskCardProps) {
+export default function TaskCard({ task, canDelete = false, selectionMode = false, isSelected = false, onToggleSelection, isDone, canEdit = true, canComment = true, compact = false }: TaskCardProps) {
   const taskDone = isDone ?? task.status === 'done';
   const router = useRouter();
   const { showNotification } = useNotification();
   const assignedUsers = task.assignedTo as unknown as IUser[];
   const [showMenu, setShowMenu] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -60,7 +64,16 @@ export default function TaskCard({ task, canDelete = false, selectionMode = fals
       const result = await deleteTask(task._id.toString());
       if (result.success) {
         setShowDeleteDialog(false);
-        showNotification('Tarea eliminada', 'success');
+        const taskId = task._id.toString();
+        showNotification('Tarea eliminada', 'success', {
+          action: {
+            label: 'Deshacer',
+            onClick: async () => {
+              await restoreItem('task', taskId);
+              router.refresh();
+            },
+          },
+        });
         router.refresh();
       } else {
         showNotification(result.error || 'Error al eliminar la tarea', 'error');
@@ -99,12 +112,17 @@ export default function TaskCard({ task, canDelete = false, selectionMode = fals
   return (
     <>
       <div
-        className={`bg-white rounded-lg p-3 sm:p-4 border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group ${selectionMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
+        className={`bg-white rounded-lg ${compact ? 'p-2' : 'p-3 sm:p-4'} border border-[#e0e0e0] hover:border-[#7a7a7a] transition-all duration-200 relative group ${selectionMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
           } ${isSelected ? 'ring-1 ring-[#0066cc] bg-[#0066cc]/5' : ''
           }`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onClick={handleClick}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setCtxMenu({ x: e.clientX, y: e.clientY });
+        }}
       >
         {/* Checkbox de selección */}
         {selectionMode && canDelete && (
@@ -183,7 +201,7 @@ export default function TaskCard({ task, canDelete = false, selectionMode = fals
         )}
 
         {/* Footer con avatares y tags */}
-        <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-[#e0e0e0]">
+        <div className={`flex items-center justify-between gap-2 ${compact ? 'mt-1 pt-1.5' : 'mt-2 pt-2'} border-t border-[#e0e0e0]`}>
           {/* Avatares */}
           {assignedUsers && assignedUsers.length > 0 ? (
             <div className="flex -space-x-1.5">
@@ -263,6 +281,21 @@ export default function TaskCard({ task, canDelete = false, selectionMode = fals
           )}
         </div>
       </div>
+
+      {/* Menú contextual (clic derecho) */}
+      {ctxMenu && (
+        <SidebarContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={[
+            { label: 'Editar', icon: Edit2, onClick: () => setShowEditModal(true) },
+            ...(canDelete
+              ? [{ label: 'Eliminar', icon: Trash2, onClick: () => setShowDeleteDialog(true), variant: 'danger' as const, separator: true }]
+              : []),
+          ]}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
 
       {/* Panel de edición */}
       <TaskDetailPanel

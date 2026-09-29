@@ -11,6 +11,7 @@ import {
   Folder,
   LayoutGrid,
   CalendarDays,
+  CheckSquare,
   FileText,
   Plus,
   LogOut,
@@ -33,6 +34,7 @@ import { useTabContext } from '@/components/tabs/TabContext';
 import { getUserProjects, deleteProject } from '@/actions/project-actions';
 import { getUserBoards, deleteBoard } from '@/actions/board-actions';
 import { getUserNotes, deleteNote } from '@/actions/note-actions';
+import { restoreItem } from '@/actions/trash-actions';
 import { getUserFavorites, toggleFavorite, FavoriteKind } from '@/actions/favorite-actions';
 import { getOverdueTasks } from '@/actions/calendar-actions';
 import { duplicateBoard } from '@/actions/board-actions';
@@ -129,14 +131,26 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
+    const target = confirmDelete;
     setDeleting(true);
     try {
       let result;
-      if (confirmDelete.type === 'project') result = await deleteProject(confirmDelete.id);
-      else if (confirmDelete.type === 'board') result = await deleteBoard(confirmDelete.id);
-      else if (confirmDelete.type === 'note') result = await deleteNote(confirmDelete.id, userId);
+      if (target.type === 'project') result = await deleteProject(target.id);
+      else if (target.type === 'board') result = await deleteBoard(target.id);
+      else if (target.type === 'note') result = await deleteNote(target.id, userId);
       if (result && !result.success) {
         showNotification(result.error || 'No se pudo eliminar', 'error');
+      } else if (result?.success) {
+        const label = target.type === 'project' ? 'Proyecto' : target.type === 'board' ? 'Tablero' : 'Nota';
+        showNotification(`${label} eliminado`, 'success', {
+          action: {
+            label: 'Deshacer',
+            onClick: async () => {
+              await restoreItem(target.type, target.id);
+              await loadData();
+            },
+          },
+        });
       }
       await loadData();
     } finally {
@@ -285,6 +299,9 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
               <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[#e03131]" />
             )}
           </Link>
+          <Link href="/my-tasks" className="p-2 rounded-lg hover:bg-[#f0f0f2] transition-colors" title="Mis tareas">
+            <CheckSquare size={16} className="text-[#5c5c5e]" />
+          </Link>
           <Link href="/trash" className="p-2 rounded-lg hover:bg-[#f0f0f2] transition-colors" title="Papelera">
             <Trash2 size={16} className="text-[#5c5c5e]" />
           </Link>
@@ -303,12 +320,12 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
       {/* Backdrop del drawer móvil */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[85] md:hidden"
+          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-85 md:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
       <div className={`flex flex-col h-full w-60 bg-white border-r border-[#e0e0e0] shrink-0 overflow-hidden
-        max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-[90] max-md:shadow-2xl
+        max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-90 max-md:shadow-2xl
         max-md:transition-transform max-md:duration-200 max-md:ease-out
         ${mobileOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'}`}>
         {/* Top: Logo + collapse */}
@@ -360,6 +377,22 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
                 {overdueCount > 9 ? '9+' : overdueCount}
               </span>
             )}
+          </button>
+
+          {/* Mis tareas */}
+          <button
+            onClick={() =>
+              navigate('/my-tasks', {
+                id: 'my-tasks',
+                type: 'calendar',
+                title: 'Mis tareas',
+                url: '/my-tasks',
+              })
+            }
+            className={linkClass('/my-tasks') + ' w-full text-left'}
+          >
+            <CheckSquare size={14} className="shrink-0" />
+            <span className="truncate">Mis tareas</span>
           </button>
 
           {/* Favorites section */}

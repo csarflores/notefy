@@ -8,6 +8,7 @@ export const config = {
     '/board/:path*',
     '/notes/:path*',
     '/calendar/:path*',
+    '/my-tasks/:path*',
     '/settings/:path*',
     '/trash/:path*',
   ],

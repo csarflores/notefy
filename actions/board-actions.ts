@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import crypto from 'crypto';
 import connectDB from '@/lib/mongodb';
 import Board from '@/models/Board';
 import Task from '@/models/Task';
@@ -215,6 +216,7 @@ export async function createBoard(
       members: projectMembers,
       projectId: data.projectId || null,
       color: data.color || '#6b7280',
+      icon: data.icon?.slice(0, 8) || '',
       order: newOrder,
     });
 
@@ -261,6 +263,7 @@ export async function updateBoard(
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.description !== undefined) updateData.description = data.description.trim();
     if (data.color !== undefined) updateData.color = data.color;
+    if (data.icon !== undefined) updateData.icon = data.icon ? data.icon.slice(0, 8) : '';
     if (data.members !== undefined) updateData.members = data.members;
     if (data.projectId !== undefined) updateData.projectId = data.projectId;
 
@@ -619,5 +622,163 @@ export async function saveBoardColumns(
   } catch (error) {
     console.error('Error al guardar columnas:', error);
     return { success: false, error: 'Error al guardar las columnas' };
+  }
+}
+
+// Crear (o devolver) el link público de solo lectura de un tablero (solo owner)
+export async function createPublicBoardLink(
+  boardId: string,
+  userId: string
+): Promise<ApiResponse<{ token: string }>> {
+  try {
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+
+    const board = await findOwnedBoard(boardId, user);
+    if (!board) {
+      return { success: false, error: 'Solo el propietario puede crear un link público' };
+    }
+
+    if (!board.publicToken) {
+      board.publicToken = crypto.randomBytes(24).toString('hex');
+      await board.save();
+    }
+
+    return { success: true, data: { token: board.publicToken } };
+  } catch (error) {
+    console.error('Error al crear link público del tablero:', error);
+    return { success: false, error: 'Error al crear el link' };
+  }
+}
+
+// Revocar el link público de un tablero (solo owner)
+export async function revokePublicBoardLink(
+  boardId: string,
+  userId: string
+): Promise<ApiResponse<null>> {
+  try {
+    const user = await getAuthUser();
+    if (!user || !isSelf(user, userId)) {
+      return { success: false, error: 'No autorizado' };
+    }
+
+    const board = await findOwnedBoard(boardId, user);
+    if (!board) {
+      return { success: false, error: 'Solo el propietario puede revocar el link' };
+    }
+
+    board.publicToken = null;
+    await board.save();
+
+    revalidatePath(`/board/${boardId}`);
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al revocar link público del tablero:', error);
+    return { success: false, error: 'Error al revocar el link' };
+  }
+}
+
+// Vista pública de solo lectura — sin sesión, acceso por token
+export async function getPublicBoard(token: string): Promise<
+  ApiResponse<{
+    name: string;
+    color: string;
+    icon?: string | null;
+    columns: IBoardColumn[];
+    tasks: {
+      _id: string;
+      title: string;
+      description?: string;
+      status: string;
+      priority?: string;
+      tags?: { text: string; color?: string }[];
+      dueDate?: string | null;
+      checklist?: { text: string; done: boolean }[];
+    }[];
+    updatedAt: string;
+  }>
+> {
+  try {
+    if (!token || typeof token !== 'string' || token.length > 128) {
+      return { success: false, error: 'Link inválido' };
+    }
+
+    await connectDB();
+    const board = await Board.findOne({ publicToken: token, deletedAt: null })
+      .select('name color icon columns publicToken updatedAt')
+      .lean();
+    if (!board) {
+      return { success: false, error: 'Tablero no encontrado o link revocado' };
+    }
+
+    const tasks = await Task.find({ boardId: board._id, deletedAt: null })
+      .select('title description status priority tags dueDate checklist')
+      .sort({ order: 1 })
+      .lean();
+
+    // Sanitización básica del HTML de descripciones (mismo patrón que getPublicNote)
+    const sanitize = (html: string) =>
+      (html ?? '')
+        .replace(/<(script|iframe|object|embed|form|link|meta)[^>]*>[\s\S]*?<\/\1>/gi, '')
+        .replace(/<(script|iframe|object|embed|form|link|meta)[^>]*\/?>/gi, '')
+        .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(/(href|src)\s*=\s*(['"]?)\s*javascript:[^'">\s]*\2/gi, '$1="#"');
+
+    return {
+      success: true,
+      data: {
+        name: board.name,
+        color: board.color,
+        icon: (board as { icon?: string }).icon ?? null,
+        columns: board.columns ?? [],
+        tasks: tasks.map((t) => ({
+          _id: t._id.toString(),
+          title: t.title,
+          description: sanitize(t.description ?? ''),
+          status: t.status,
+          priority: t.priority,
+          tags: t.tags?.map((tag) => ({ text: tag.text, color: tag.color })),
+          dueDate: t.dueDate ? new Date(t.dueDate).toISOString() : null,
+          checklist: t.checklist?.map((item) => ({ text: item.text, done: item.done })),
+        })),
+        updatedAt: board.updatedAt ? new Date(board.updatedAt).toISOString() : '',
+      },
+    };
+  } catch (error) {
+    console.error('Error al obtener tablero público:', error);
+    return { success: false, error: 'Error al obtener el tablero' };
+  }
+}
+
+// Timestamp de última modificación del tablero (board + tareas) para polling
+export async function getBoardUpdatedAt(
+  boardId: string
+): Promise<ApiResponse<{ updatedAt: number }>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const board = await findAccessibleBoard(boardId, user);
+    if (!board) {
+      return { success: false, error: 'Tablero no encontrado' };
+    }
+
+    const latest = await Task.findOne({ boardId })
+      .sort({ updatedAt: -1 })
+      .select('updatedAt deletedAt')
+      .lean();
+
+    const boardTs = board.updatedAt ? new Date(board.updatedAt).getTime() : 0;
+    const taskTs = latest?.updatedAt ? new Date(latest.updatedAt).getTime() : 0;
+    const deletedTs = latest?.deletedAt ? new Date(latest.deletedAt).getTime() : 0;
+
+    return { success: true, data: { updatedAt: Math.max(boardTs, taskTs, deletedTs) } };
+  } catch (error) {
+    console.error('Error al verificar actualización del tablero:', error);
+    return { success: false, error: 'Error al verificar actualizaciones' };
   }
 }

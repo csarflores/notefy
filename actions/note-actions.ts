@@ -3,11 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import connectDB from '@/lib/mongodb';
 import Note from '@/models/Note';
-import { CreateNoteInput, UpdateNoteInput, ApiResponse, INote, MemberRole } from '@/types';
+import { CreateNoteInput, UpdateNoteInput, ApiResponse, INote, INoteVersion, IComment, MemberRole } from '@/types';
 import { isValidObjectId } from '@/lib/utils';
 import { createInvitation } from '@/actions/invitation-actions';
 import { escapeRegExp } from '@/lib/utils';
 import crypto from 'crypto';
+import User from '@/models/User';
+import { notifyUser } from '@/lib/notify';
+import { canComment, AuthUser } from '@/lib/auth-helpers';
 import {
   getAuthUser,
   isSelf,
@@ -248,9 +251,33 @@ export async function updateNote(
       updateData.members = data.members;
     }
 
+    // Snapshot de la versión anterior cuando cambia el contenido o el título
+    const contentChanged =
+      (data.content !== undefined && data.content !== note.content) ||
+      (data.title !== undefined && data.title.trim() !== note.title);
+
     const updatedNote = await Note.findByIdAndUpdate(
       noteId,
-      updateData,
+      {
+        ...updateData,
+        ...(contentChanged
+          ? {
+              $push: {
+                versions: {
+                  $each: [
+                    {
+                      title: note.title,
+                      content: note.content,
+                      savedBy: user.id,
+                      savedByName: user.name,
+                    },
+                  ],
+                  $slice: -30,
+                },
+              },
+            }
+          : {}),
+      },
       { new: true, runValidators: true }
     ).lean();
 
@@ -566,5 +593,243 @@ export async function getPublicNote(
   } catch (error) {
     console.error('Error al obtener nota pública:', error);
     return { success: false, error: 'Error al obtener la nota' };
+  }
+}
+
+// ─── Historial de versiones ─────────────────────────────────────────────────
+
+// Devuelve la nota si el usuario puede verla (owner, miembro shared o proyecto)
+async function findReadableNote(noteId: string, user: AuthUser) {
+  if (!isValidObjectId(noteId)) return null;
+  await connectDB();
+  const note = await Note.findById(noteId);
+  if (!note || note.deletedAt) return null;
+  if (isOwner(note, user)) return note;
+  if (note.visibility === 'shared' && note.members.includes(user.email)) return note;
+  if (note.visibility === 'shared' && note.projectId) {
+    const project = await findAccessibleProject(note.projectId.toString(), user);
+    if (project) return note;
+  }
+  return null;
+}
+
+// Devuelve la nota si el usuario puede editarla (owner o miembro editor)
+async function findEditableNote(noteId: string, user: AuthUser) {
+  const note = await findReadableNote(noteId, user);
+  if (!note) return null;
+  if (isOwner(note, user)) return note;
+  const role = note.memberRoles?.get(user.email) ?? 'editor';
+  if (note.members.includes(user.email) && role === 'editor') return note;
+  return null;
+}
+
+// Historial de versiones de una nota (más reciente primero)
+export async function getNoteVersions(noteId: string): Promise<ApiResponse<INoteVersion[]>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const note = await findReadableNote(noteId, user);
+    if (!note) {
+      return { success: false, error: 'Nota no encontrada o sin permisos' };
+    }
+
+    const versions = [...(note.versions ?? [])].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    return { success: true, data: JSON.parse(JSON.stringify(versions)) };
+  } catch (error) {
+    console.error('Error al obtener versiones:', error);
+    return { success: false, error: 'Error al obtener las versiones' };
+  }
+}
+
+// Restaurar una versión anterior (guarda el estado actual como nueva versión)
+export async function restoreNoteVersion(
+  noteId: string,
+  versionId: string
+): Promise<ApiResponse<INote>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+    if (!isValidObjectId(versionId)) {
+      return { success: false, error: 'ID de versión inválido' };
+    }
+
+    const note = await findEditableNote(noteId, user);
+    if (!note) {
+      return { success: false, error: 'Nota no encontrada o sin permisos de edición' };
+    }
+
+    const version = note.versions?.find((v) => v._id.toString() === versionId);
+    if (!version) {
+      return { success: false, error: 'Versión no encontrada' };
+    }
+
+    // Guardar el estado actual como versión antes de restaurar
+    note.versions = [
+      ...(note.versions ?? []).slice(-29),
+      {
+        title: note.title,
+        content: note.content,
+        savedBy: user.id,
+        savedByName: user.name,
+      } as unknown as INoteVersion,
+    ] as INote['versions'];
+
+    note.title = version.title;
+    note.content = version.content;
+    await note.save();
+
+    revalidatePath(`/notes/${noteId}`);
+    revalidatePath('/dashboard');
+
+    return { success: true, data: JSON.parse(JSON.stringify(note.toObject())) };
+  } catch (error) {
+    console.error('Error al restaurar versión:', error);
+    return { success: false, error: 'Error al restaurar la versión' };
+  }
+}
+
+// Eliminar una entrada del historial (solo propietario)
+export async function deleteNoteVersion(
+  noteId: string,
+  versionId: string
+): Promise<ApiResponse<null>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+    if (!isValidObjectId(versionId)) {
+      return { success: false, error: 'ID de versión inválido' };
+    }
+
+    const note = await findEditableNote(noteId, user);
+    if (!note || !isOwner(note, user)) {
+      return { success: false, error: 'Solo el propietario puede eliminar versiones' };
+    }
+
+    note.versions = (note.versions ?? []).filter(
+      (v) => v._id.toString() !== versionId
+    ) as INote['versions'];
+    await note.save();
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al eliminar versión:', error);
+    return { success: false, error: 'Error al eliminar la versión' };
+  }
+}
+
+// ─── Comentarios en notas ───────────────────────────────────────────────────
+
+// Agregar un comentario a una nota
+export async function addNoteComment(
+  noteId: string,
+  content: string
+): Promise<ApiResponse<IComment>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+
+    const trimmed = content?.trim();
+    if (!trimmed) {
+      return { success: false, error: 'El comentario no puede estar vacío' };
+    }
+    if (trimmed.length > 2000) {
+      return { success: false, error: 'El comentario no puede exceder 2000 caracteres' };
+    }
+
+    const note = await findReadableNote(noteId, user);
+    if (!note) {
+      return { success: false, error: 'Nota no encontrada o sin permisos' };
+    }
+
+    // Los lectores ('viewer') no comentan: owner sí; miembros según rol
+    const isNoteOwner = isOwner(note, user);
+    if (!isNoteOwner && note.members.includes(user.email) && !canComment(note, user)) {
+      return { success: false, error: 'No tienes permiso para comentar en esta nota' };
+    }
+
+    const dbUser = await User.findById(user.id).select('image name').lean();
+    note.comments = note.comments ?? [];
+    note.comments.push({
+      authorId: user.id,
+      authorName: dbUser?.name || user.name,
+      authorImage: dbUser?.image || user.image || null,
+      content: trimmed,
+    } as unknown as IComment);
+
+    await note.save();
+
+    const newComment = note.comments[note.comments.length - 1];
+
+    // Notificar al propietario si comenta otra persona
+    if (!isNoteOwner) {
+      await notifyUser(
+        note.owner.toString(),
+        'comment',
+        `${user.name} comentó en tu nota "${note.title}"`,
+        `/notes/${noteId}`
+      );
+    }
+
+    revalidatePath(`/notes/${noteId}`);
+
+    return { success: true, data: JSON.parse(JSON.stringify(newComment)) };
+  } catch (error) {
+    console.error('Error al agregar comentario a la nota:', error);
+    return { success: false, error: 'Error al agregar el comentario' };
+  }
+}
+
+// Eliminar un comentario de una nota (autor del comentario o propietario de la nota)
+export async function deleteNoteComment(
+  noteId: string,
+  commentId: string
+): Promise<ApiResponse<null>> {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { success: false, error: 'No autenticado' };
+    }
+    if (!isValidObjectId(commentId)) {
+      return { success: false, error: 'ID inválido' };
+    }
+
+    const note = await findReadableNote(noteId, user);
+    if (!note) {
+      return { success: false, error: 'Nota no encontrada o sin permisos' };
+    }
+
+    const index = (note.comments ?? []).findIndex((c) => c._id.toString() === commentId);
+    if (index === -1) {
+      return { success: false, error: 'Comentario no encontrado' };
+    }
+
+    const comment = note.comments![index];
+    const canDelete =
+      comment.authorId.toString() === user.id || isOwner(note, user);
+    if (!canDelete) {
+      return { success: false, error: 'No tienes permiso para eliminar este comentario' };
+    }
+
+    note.comments!.splice(index, 1);
+    await note.save();
+
+    revalidatePath(`/notes/${noteId}`);
+
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error al eliminar comentario de la nota:', error);
+    return { success: false, error: 'Error al eliminar el comentario' };
   }
 }

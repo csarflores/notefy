@@ -29,7 +29,7 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
               {s.keys.map((k) => (
                 <kbd
                   key={k}
-                  className="min-w-[24px] text-center text-[11px] font-mono text-[#7a7a7a] bg-[#f5f5f7] border border-[#e5e5ea] border-b-2 rounded px-1.5 py-0.5"
+                  className="min-w-6 text-center text-[11px] font-mono text-[#7a7a7a] bg-[#f5f5f7] border border-[#e5e5ea] border-b-2 rounded px-1.5 py-0.5"
                 >
                   {k}
                 </kbd>

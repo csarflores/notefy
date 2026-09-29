@@ -91,7 +91,11 @@ export default function ProjectCard({ project, boardCount, onBoardDrop, isFavori
                 className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                 style={{ backgroundColor: color + '1a' }}
               >
-                <Folder size={13} style={{ color }} />
+                {project.icon ? (
+                  <span className="text-[14px] leading-none">{project.icon}</span>
+                ) : (
+                  <Folder size={13} style={{ color }} />
+                )}
               </div>
               <div className="min-w-0">
                 <h3 className="text-[14px] font-semibold text-[#1d1d1f] truncate tracking-[-0.2px]">

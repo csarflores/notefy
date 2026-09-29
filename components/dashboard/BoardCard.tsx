@@ -156,7 +156,11 @@ export default function BoardCard({
               className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
               style={{ backgroundColor: (board.color || '#6b7280') + '1a' }}
             >
-              <LayoutGrid size={13} style={{ color: board.color || '#6b7280' }} />
+              {board.icon ? (
+                <span className="text-[14px] leading-none">{board.icon}</span>
+              ) : (
+                <LayoutGrid size={13} style={{ color: board.color || '#6b7280' }} />
+              )}
             </div>
             <div className="min-w-0">
               <h3 className="text-[14px] font-semibold text-[#1d1d1f] truncate tracking-[-0.2px]">

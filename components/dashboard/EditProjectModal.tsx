@@ -8,6 +8,7 @@ import { updateProject } from '@/actions/project-actions';
 import { IProject } from '@/types';
 import { Save, X, Palette } from 'lucide-react';
 import { PROJECT_COLORS } from '@/constants/project-colors';
+import IconPicker from '@/components/ui/IconPicker';
 
 interface EditProjectModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#0066cc');
+  const [icon, setIcon] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -31,6 +33,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
       setName(project.name);
       setDescription(project.description || '');
       setColor(project.color || '#0066cc');
+      setIcon(project.icon || '');
     }
   }, [project]);
 
@@ -50,6 +53,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
         name: name.trim(),
         description: description.trim(),
         color: color,
+        icon: icon,
       });
 
       if (result.success) {
@@ -137,6 +141,7 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
           <div className="space-y-3">
             {/* Color seleccionado actual */}
             <div className="flex items-center gap-3">
+              <IconPicker value={icon} onChange={setIcon} />
               <button
                 type="button"
                 onClick={() => setShowColorPicker(!showColorPicker)}

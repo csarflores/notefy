@@ -101,7 +101,7 @@ export default function TabBar() {
       </button>
       <div
         ref={barRef}
-        className="flex items-end flex-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex items-end flex-1 overflow-x-auto overflow-y-hidden scrollbar-none [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => {
           const Icon = TAB_ICONS[tab.type] ?? LayoutDashboard;
@@ -112,7 +112,7 @@ export default function TabBar() {
               key={tab.id}
               onClick={() => handleTabClick(tab)}
               onMouseDown={(e) => handleMiddleClick(e, tab)}
-              className={`group relative flex items-center gap-1.5 px-3 h-8 min-w-[80px] max-w-[180px] cursor-pointer select-none shrink-0 rounded-t-md transition-colors ${
+              className={`group relative flex items-center gap-1.5 px-3 h-8 min-w-20 max-w-45 cursor-pointer select-none shrink-0 rounded-t-md transition-colors ${
                 isActive
                   ? 'bg-white border-t border-l border-r border-[#d1d1d6] text-[#1d1d1f] font-medium -mb-px z-10'
                   : 'text-[#7a7a7a] hover:bg-white/50 hover:text-[#3c3c43]'

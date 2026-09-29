@@ -6,11 +6,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Folder, LayoutGrid, FileText, CheckSquare,
   Plus, FolderPlus, Clock, X, CornerDownLeft, CalendarDays,
+  Sun, Moon, ListChecks,
 } from 'lucide-react';
 import { globalSearch, SearchResult } from '@/actions/search-actions';
+import { getUserBoards } from '@/actions/board-actions';
 import { useCommandPalette } from './CommandPaletteContext';
 import { useTabContext } from '@/components/tabs/TabContext';
 import { useRecents, RecentItem } from './useRecents';
+import { applyTheme, getStoredTheme, cycleTheme } from '@/lib/theme';
+import { IBoard } from '@/types';
 
 const TYPE_META = {
   project: { icon: Folder, label: 'Proyectos' },
@@ -64,6 +68,9 @@ export default function CommandPalette({ userId, onCreateProject, onCreateBoard,
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Modo "elegir tablero" para la acción Nueva tarea
+  const [boardPicker, setBoardPicker] = useState(false);
+  const [boards, setBoards] = useState<IBoard[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,14 +93,16 @@ export default function CommandPalette({ userId, onCreateProject, onCreateBoard,
       setQuery('');
       setResults([]);
       setActiveIndex(0);
+      setBoardPicker(false);
+      setBoards([]);
       setTimeout(() => inputRef.current?.focus(), 30);
     }
   }, [isOpen]);
 
-  // Debounced search
+  // Debounced search (en modo board-picker se filtra localmente)
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) {
+    if (boardPicker || !query.trim()) {
       setResults([]);
       setLoading(false);
       return;
@@ -106,7 +115,7 @@ export default function CommandPalette({ userId, onCreateProject, onCreateBoard,
       setLoading(false);
       setActiveIndex(0);
     }, 200);
-  }, [query, userId]);
+  }, [query, userId, boardPicker]);
 
   const navigate = useCallback((result: SearchResult) => {
     close();
@@ -138,10 +147,48 @@ export default function CommandPalette({ userId, onCreateProject, onCreateBoard,
     fn();
   }, [close]);
 
+  // "Nueva tarea": pedir el tablero destino, luego abrir ?newTask=1
+  const startBoardPicker = useCallback(async () => {
+    setLoading(true);
+    setBoardPicker(true);
+    setQuery('');
+    setActiveIndex(0);
+    const res = await getUserBoards(userId);
+    if (res.success && res.data) setBoards(res.data);
+    setLoading(false);
+    setTimeout(() => inputRef.current?.focus(), 30);
+  }, [userId]);
+
+  const pickBoard = useCallback((board: IBoard) => {
+    close();
+    const id = board._id.toString();
+    openTab({ id: `board-${id}`, type: 'board', title: board.name, url: `/board/${id}`, resourceId: id });
+    pushRecent({ id: `board-${id}`, type: 'board', title: board.name, url: `/board/${id}` });
+    router.push(`/board/${id}?newTask=1`);
+  }, [close, openTab, pushRecent, router]);
+
+  const toggleTheme = useCallback(() => {
+    applyTheme(cycleTheme(getStoredTheme()));
+  }, []);
+
   // Build sections
   const sections: PaletteSection[] = [];
 
-  if (!query.trim()) {
+  if (boardPicker) {
+    const q = query.trim().toLowerCase();
+    const filtered = q
+      ? boards.filter((b) => b.name.toLowerCase().includes(q))
+      : boards;
+    sections.push({
+      label: 'Elegir tablero para la nueva tarea',
+      items: filtered.map((b) => ({
+        key: `pick-${b._id}`,
+        icon: LayoutGrid,
+        title: b.name,
+        onSelect: () => pickBoard(b),
+      })),
+    });
+  } else if (!query.trim()) {
     if (recents.length > 0) {
       sections.push({
         label: 'Recientes',
@@ -156,6 +203,12 @@ export default function CommandPalette({ userId, onCreateProject, onCreateBoard,
     sections.push({
       label: 'Acciones',
       items: [
+        {
+          key: 'action-task',
+          icon: CheckSquare,
+          title: 'Nueva tarea',
+          onSelect: () => void startBoardPicker(),
+        },
         {
           key: 'action-board',
           icon: Plus,
@@ -176,6 +229,24 @@ export default function CommandPalette({ userId, onCreateProject, onCreateBoard,
           title: 'Nuevo proyecto',
           hint: 'P',
           onSelect: () => runAction(onCreateProject),
+        },
+        {
+          key: 'action-calendar',
+          icon: CalendarDays,
+          title: 'Ir al calendario',
+          onSelect: () => runAction(() => router.push('/calendar')),
+        },
+        {
+          key: 'action-mytasks',
+          icon: ListChecks,
+          title: 'Ir a mis tareas',
+          onSelect: () => runAction(() => router.push('/my-tasks')),
+        },
+        {
+          key: 'action-theme',
+          icon: typeof window !== 'undefined' && document.documentElement.classList.contains('dark') ? Sun : Moon,
+          title: 'Cambiar tema',
+          onSelect: () => runAction(toggleTheme),
         },
       ],
     });
@@ -264,7 +335,7 @@ export default function CommandPalette({ userId, onCreateProject, onCreateBoard,
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar proyectos, tableros, notas, tareas..."
+                placeholder={boardPicker ? 'Filtrar tableros...' : 'Buscar proyectos, tableros, notas, tareas...'}
                 className="flex-1 bg-transparent text-[15px] text-[#1d1d1f] placeholder-[#a0a0a8] outline-none"
               />
               {query && (
