@@ -74,20 +74,26 @@ export default function BoardClient({ board, tasks, boardUsers, boardTags, proje
     }
   };
 
-  // Deep-link: abrir una tarea puntual via ?task=<id> (ej. desde la búsqueda)
-  // o el modal de creación via ?newTask=1 (desde el command palette)
+  // Deep-link: abrir una tarea puntual via ?task=<id> (ej. desde la búsqueda
+  // o las notificaciones) o el modal de creación via ?newTask=1 (command palette).
+  // Los params consumidos se quitan de la URL para que un router.refresh()
+  // (BoardSyncer) no vuelva a abrir el panel después de cerrarlo.
+  const taskParam = searchParams.get('task');
+  const newTaskParam = searchParams.get('newTask');
   useEffect(() => {
-    const taskId = searchParams.get('task');
-    if (taskId) {
-      const task = tasks.find((t) => t._id.toString() === taskId);
-      if (task) setEditingTask(task);
-    }
-    if (searchParams.get('newTask') && canEdit) {
-      setIsTaskModalOpen(true);
-    }
-  // Solo al montar con las tareas iniciales
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const task = taskParam ? tasks.find((t) => t._id.toString() === taskParam) : undefined;
+    const openNew = !!(newTaskParam && canEdit);
+    if (!task && !openNew) return;
+
+    if (task) setEditingTask(task);
+    if (openNew) setIsTaskModalOpen(true);
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (task) params.delete('task');
+    if (openNew) params.delete('newTask');
+    const qs = params.toString();
+    router.replace(`/board/${board._id}${qs ? `?${qs}` : ''}`, { scroll: false });
+  }, [taskParam, newTaskParam, tasks, canEdit, searchParams, router, board._id]);
 
   const handleDeleteBoard = async () => {
     setIsDeleting(true);
