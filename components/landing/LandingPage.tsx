@@ -358,7 +358,7 @@ function Footer() {
             Crear cuenta
           </Link>
         </div>
-        <p className="text-[12px] text-[#a0a0a8]">© {new Date().getFullYear()} Harold</p>
+        <p className="text-[12px] text-[#a0a0a8]">© {new Date().getFullYear()} Harold. Un producto de <a href="https://nutbell.net" targte="_blank" className="text-[#ffb300]">Nutbell</a></p>
       </div>
     </footer>
   );
