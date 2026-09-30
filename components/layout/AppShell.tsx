@@ -49,6 +49,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const userId = session.user.id;
   const userName = session.user.name ?? '';
   const userEmail = session.user.email ?? undefined;
+  const userImage = session.user.image ?? null;
 
   return (
     <CommandPaletteProvider>
@@ -59,6 +60,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           userId={userId}
           userName={userName}
           userEmail={userEmail}
+          userImage={userImage}
         />
 
         {/* Right: TabBar + scrollable content */}

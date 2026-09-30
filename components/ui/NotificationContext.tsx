@@ -77,7 +77,7 @@ function NotificationContainer() {
 
   return (
     <div
-      className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none"
+      className="fixed top-4 left-1/2 -translate-x-1/2 z-100 flex flex-col items-center gap-2 pointer-events-none"
       role="status"
       aria-live="polite"
     >
@@ -86,7 +86,7 @@ function NotificationContainer() {
         return (
           <div
             key={notification.id}
-            className="pointer-events-auto flex items-center gap-2.5 pl-3.5 pr-2.5 py-2.5 rounded-full text-[13px] font-medium min-w-[240px] max-w-[90vw]
+            className="pointer-events-auto flex items-center gap-2.5 pl-3.5 pr-2.5 py-2.5 rounded-full text-[13px] font-medium min-w-60 max-w-[90vw]
               bg-white/90 text-[#1d1d1f] border border-[#e5e5ea] shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl
               dark:bg-[#2c2c2e]/90 dark:text-[#f5f5f7] dark:border-[#48484a]
               animate-in slide-in-from-top-3 fade-in-20"

@@ -1,6 +1,8 @@
 // src/components/ui/Logo.tsx
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { assetPath } from '@/lib/assets';
 
 export const Logo = ({ 
   className = "h-10 w-10",
@@ -18,26 +20,15 @@ export const Logo = ({
   
   const logoContent = (
     <div className="flex items-center gap-3 select-none">
-      {/* Isotipo: anteojos (símbolo oficial de Harold) */}
-      <svg
+      {/* Isotipo oficial de Harold (asset pack activo en /public) */}
+      <Image
+        src={assetPath('harold-app-icon-512.png')}
+        alt="Harold"
+        width={512}
+        height={512}
         className={iconSize}
-        viewBox="0 0 1000 1000"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <g
-          stroke="#0066cc"
-          strokeWidth="72"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="320" cy="500" r="205" />
-          <circle cx="680" cy="500" r="205" />
-          <path d="M525 500 C550 500 570 500 595 500" />
-          <path d="M115 500 H70" />
-          <path d="M885 500 H930" />
-        </g>
-      </svg>
+        priority
+      />
       
       {/* Logotipo / Texto */}
       {showText && (

@@ -131,7 +131,7 @@ function PropertyRow({
 }) {
   return (
     <div className="flex items-start gap-3 py-1.5">
-      <div className="w-[104px] shrink-0 flex items-center gap-1.5 pt-1 text-[12px] text-[#8e8e93]">
+      <div className="w-26 shrink-0 flex items-center gap-1.5 pt-1 text-[12px] text-[#8e8e93]">
         {icon}
         <span>{label}</span>
       </div>
@@ -935,7 +935,7 @@ export default function TaskDetailPanel({
             </PropertyRow>
 
             <div className="flex gap-3 py-1.5">
-              <div className="w-[104px] shrink-0 flex items-center gap-1.5 pt-1 text-[12px] text-[#8e8e93]">
+              <div className="w-26 shrink-0 flex items-center gap-1.5 pt-1 text-[12px] text-[#8e8e93]">
                 <Calendar size={13} />
                 <span>Fechas</span>
               </div>

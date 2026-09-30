@@ -19,6 +19,8 @@ const nextConfig: NextConfig = {
       // sesiones activas o comments.authorImage) muestran imagen rota en vez de
       // romper el render de next/image
       { protocol: "https", hostname: "**.cloudfront.net" },
+      // Fotos de perfil de cuentas Google
+      { protocol: "https", hostname: "**.googleusercontent.com" },
     ],
   },
 };

@@ -15,7 +15,6 @@ import {
   FileText,
   Plus,
   LogOut,
-  User,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -28,6 +27,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logotipo';
+import Avatar from '@/components/ui/Avatar';
 import { useSidebar } from './SidebarContext';
 import { useCommandPalette } from './CommandPaletteContext';
 import { useTabContext } from '@/components/tabs/TabContext';
@@ -54,6 +54,7 @@ interface SidebarProps {
   userId: string;
   userName: string;
   userEmail?: string;
+  userImage?: string | null;
 }
 
 interface ProjectTree {
@@ -71,7 +72,7 @@ interface FavoriteEntry {
   resourceId: string;
 }
 
-export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
+export default function Sidebar({ userId, userName, userEmail, userImage }: SidebarProps) {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebar();
   const { open: openSearch } = useCommandPalette();
   const { showNotification } = useNotification();
@@ -307,8 +308,8 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
           </Link>
         </div>
         <div className="mt-auto flex flex-col items-center pb-3 gap-1">
-          <Link href="/settings" className="p-2 rounded-full bg-[#f0f0f2] hover:bg-[#e5e5ea] transition-colors" title={userName}>
-            <User size={14} className="text-[#5c5c5e]" />
+          <Link href="/settings" className="p-1 rounded-full hover:bg-[#e5e5ea] transition-colors" title={userName}>
+            <Avatar src={userImage} name={userName || 'U'} size="sm" />
           </Link>
         </div>
       </div>
@@ -690,11 +691,12 @@ export default function Sidebar({ userId, userName, userEmail }: SidebarProps) {
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#f0f0f2] transition-colors mb-1"
             title="Mi cuenta"
           >
-            <span className="w-6 h-6 rounded-full bg-[#0066cc] flex items-center justify-center shrink-0">
-              <span className="text-[10px] font-bold text-white uppercase">
-                {userName?.charAt(0) || 'U'}
-              </span>
-            </span>
+            <Avatar
+              src={userImage}
+              name={userName || 'U'}
+              size="sm"
+              className="shrink-0 text-[10px] font-bold"
+            />
             <span className="flex-1 min-w-0">
               <span className="block text-[12px] font-medium text-[#1d1d1f] truncate">{userName}</span>
               {userEmail && (

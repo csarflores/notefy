@@ -65,9 +65,9 @@ export default function Drawer({ isOpen, onClose, children, className }: DrawerP
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 380, damping: 36 }}
             className={cn(
-              'fixed top-0 right-0 h-full w-full sm:w-[560px] z-50',
+              'fixed top-0 right-0 h-full w-full sm:w-140 z-50',
               'bg-white flex flex-col overflow-hidden',
-              'shadow-[-16px_0_48px_-8px_rgba(0,0,0,0.14)] sm:border-l sm:border-black/[0.06]',
+              'shadow-[-16px_0_48px_-8px_rgba(0,0,0,0.14)] sm:border-l sm:border-black/6',
               className
             )}
             onClick={(e) => e.stopPropagation()}

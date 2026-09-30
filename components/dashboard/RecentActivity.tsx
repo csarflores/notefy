@@ -88,7 +88,7 @@ export default function RecentActivity() {
                 style={{ backgroundColor: item.boardColor }}
               />
               <span className="text-[13px] text-[#1d1d1f] truncate flex-1">{item.title}</span>
-              <span className="text-[11px] text-[#8e8e93] truncate max-w-[100px] hidden sm:inline">
+              <span className="text-[11px] text-[#8e8e93] truncate max-w-25 hidden sm:inline">
                 {item.boardName}
               </span>
               <span className="text-[11px] text-[#c7c7cc] shrink-0">{timeAgo(item.updatedAt)}</span>
